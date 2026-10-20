@@ -243,56 +243,39 @@ function setCardDisabled(card, disabled) {
   card.querySelectorAll("input").forEach((i) => (i.disabled = disabled));
 }
 
-function layoutBoard() {
-  const board = $("#board");
-  if (!board) return;
-  const rows = board.querySelectorAll(".board-row");
-  if (rows.length < 2) return;
-  const row0 = rows[0];
-  const row1 = rows[1];
-  row0.innerHTML = "";
-  row1.innerHTML = "";
-
-  const groups = state.groups || [];
-  const counts = api.boardRows(groups.length);
-  const firstCount = counts[0] || 0;
-  // Distribute: put ceil(N/2) in row0, rest in row1
-  groups.forEach((group, idx) => {
-    // We need to know which card to put where; build cards on-the-fly by moving existing
-  });
-}
-
+// Keep existing card nodes; only create/remove/move when the group set or
+// layout actually changes, so a score update never re-triggers the enter
+// animation (no flash on every board refresh).
 function renderBoard() {
   const board = $("#board");
   if (!board) return;
   const rows = board.querySelectorAll(".board-row");
   if (rows.length < 2) return;
-  const row0 = rows[0];
-  const row1 = rows[1];
-  // Clear rows
-  row0.innerHTML = "";
-  row1.innerHTML = "";
 
   const groups = state.groups || [];
-  if (groups.length === 0) {
-    updatePlayChrome();
-    return;
+  const firstCount = api.boardRows(groups.length)[0] || 0;
+
+  // Sweep away cards whose group no longer exists.
+  const keep = new Set(groups.map((g) => g.id));
+  for (const card of board.querySelectorAll(".card")) {
+    if (!keep.has(card.dataset.groupId)) card.remove();
   }
 
-  const counts = api.boardRows(groups.length);
-  const firstCount = counts[0] || 0;
   groups.forEach((group, idx) => {
+    const inFirstRow = idx < firstCount;
+    const row = inFirstRow ? rows[0] : rows[1];
+    const slot = inFirstRow ? idx : idx - firstCount;
     let card = board.querySelector(`.card[data-group-id="${group.id}"]`);
     if (!card) {
       card = cardTemplatePlay(group);
-    } else {
-      patchCardPlay(card, group);
     }
-    if (idx < firstCount) {
-      row0.appendChild(card);
-    } else {
-      row1.appendChild(card);
+    // Re-parent or re-order in place only when the position actually differs;
+    // insertBefore with the right neighbour keeps DOM churn at zero for the
+    // common case (score updates), so nothing re-animates.
+    if (card.parentElement !== row || row.children[slot] !== card) {
+      row.insertBefore(card, row.children[slot] || null);
     }
+    patchCardPlay(card, group);
   });
 
   updatePlayChrome();
