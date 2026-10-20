@@ -7,9 +7,11 @@ backend, no sign-in. Built with plain HTML/CSS/JavaScript.
 
 ## How does it work?
 
-1. **Create groups** (2 is a good minimum, up to 6). Each group gets a color from
+1. **Create groups** (2 is a good minimum, up to 6) with one click — no naming
+   needed: each group is automatically named after its color. Colors come from
    the chromatic wheel: a random starting hue is drawn, and the wheel is split
-   evenly among the groups (constant saturation/lightness, pure HSL).
+   evenly among the groups (constant saturation/lightness, pure HSL), so every
+   group wears a distinct color name (red, orange, green, cyan, …).
 2. **Add users** by name. Each user lands in a random group chosen among the
    groups with the *fewest* members, so no group starves while others fill up.
    You can remove a member or an empty group at any time.
@@ -25,7 +27,8 @@ The current board also survives page refreshes: state is auto-saved to
 
 ## Run it
 
-Open `index.html` directly, or serve the folder:
+Double-click `index.html` — the page works straight from the file system
+(no server needed, `localStorage` included). Or serve the folder if you prefer:
 
 ```bash
 python3 -m http.server 8000
