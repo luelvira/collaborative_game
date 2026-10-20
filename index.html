@@ -52,9 +52,28 @@
         <p id="status-line" class="status">Live</p>
       </div>
       <div class="controls">
+        <button type="button" id="sound-toggle" class="ghost" aria-label="Sonido">🔊</button>
         <button type="button" id="end-contest" class="danger">End contest</button>
       </div>
     </header>
+    <section id="q-strip" class="q-strip" hidden>
+      <form id="q-draft" hidden>
+        <input id="q-input" type="text" maxlength="200" placeholder="Escribe la pregunta">
+        <input id="q-seconds" type="number" min="5" max="300" step="5" value="30">
+        <button type="submit" id="launch-question" class="primary">Mostrar y arrancar</button>
+      </form>
+      <div id="q-live" hidden>
+        <h2 id="q-text"></h2>
+        <span class="q-count"><span id="q-timer">30</span><span class="q-bar"><span id="q-bar"></span></span></span>
+      </div>
+      <div id="q-after" hidden>
+        <h2 id="q-result"></h2>
+        <div class="q-actions">
+          <button type="button" id="undo-award">↩ deshacer punto</button>
+          <button type="button" id="next-question" class="primary">Siguiente pregunta</button>
+        </div>
+      </div>
+    </section>
     <main id="board" class="board" aria-live="polite"></main>
   </section>
 

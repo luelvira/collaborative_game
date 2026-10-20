@@ -215,7 +215,7 @@ it("loading a frozen state after refresh restores the winner view", async () => 
   }
 });
 
-it("boot renders one card per stored group with score and chip", async () => {
+it("boot renders one card per stored group with score and team top border", async () => {
   const { document, window, cleanup } = bootWithSeededState(seedThreeGroupsSevenUsers);
   try {
     await appModule();
@@ -225,8 +225,11 @@ it("boot renders one card per stored group with score and chip", async () => {
     const scores = [...cards].map((c) => c.querySelector(".score").textContent);
     const total = scores.reduce((acc, s) => acc + Number(s), 0);
     expect(total).toBe(7);
-    const chips = [...cards].map((c) => c.querySelector(".chip").style.background);
-    chips.forEach((c) => expect(c).toMatch(/^hsl\(\d+, 90%, 60%\)$/));
+    // team identity: thick flat top border + the CSS var used by award flash
+    [...cards].forEach((c) => {
+      expect(c.style.borderTop).toMatch(/^10px solid hsl\(\d+, 90%, 60%\)$/);
+      expect(c.style.getPropertyValue("--team-color")).toMatch(/^hsl\(\d+, 90%, 60%\)$/);
+    });
   } finally {
     cleanup();
   }
@@ -262,7 +265,7 @@ it("clicking +1 updates the score and persists", async () => {
     const scoreNode = firstCard.querySelector(".score");
     const before = Number(scoreNode.textContent);
     firstCard
-      .querySelector('.points-row [data-delta="1"]')
+      .querySelector('.points-row [data-action="award"]')
       .dispatchEvent(new window.Event("click", { bubbles: true }));
     const freshScore = document.querySelector("#board .card .score");
     expect(Number(freshScore.textContent)).toBe(before + 1);

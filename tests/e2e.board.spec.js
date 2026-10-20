@@ -1,5 +1,19 @@
 import { test, expect } from "@playwright/test";
 
+// Drive a contest to the play view from wherever the describe's beforeEach
+// leaves the page (it needs the setup screen in front of it).
+async function setupContest(page, groups, players) {
+  await page.locator("#group-count").fill(String(groups));
+  await page.locator("#group-count").dispatchEvent("change");
+  await expect(page.locator("#setup-groups input.setup-group-name")).toHaveCount(groups);
+  for (const name of players) {
+    await page.fill("#user-name", name);
+    await page.locator("#add-user").click();
+  }
+  await page.locator("#start-contest").click();
+  await expect(page.locator("#view-play")).toBeVisible();
+}
+
 // Start every scenario from a pristine board for this page origin, then go
 // home -> setup through the new game button.
 test.describe("contest board end-to-end", () => {
@@ -14,18 +28,6 @@ test.describe("contest board end-to-end", () => {
     await page.locator("#fresh-session").click();
     await expect(page.locator("#view-setup")).toBeVisible();
   });
-
-  async function setupContest(page, groups, players) {
-    await page.locator("#group-count").fill(String(groups));
-    await page.locator("#group-count").dispatchEvent("change");
-    await expect(page.locator("#setup-groups input.setup-group-name")).toHaveCount(groups);
-    for (const name of players) {
-      await page.fill("#user-name", name);
-      await page.locator("#add-user").click();
-    }
-    await page.locator("#start-contest").click();
-    await expect(page.locator("#view-play")).toBeVisible();
-  }
 
   test("setup creates N color-named groups with zero typing", async ({ page }) => {
     await page.locator("#group-count").fill("2");
@@ -55,12 +57,12 @@ test.describe("contest board end-to-end", () => {
     expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(1);
   });
 
-  test("awards points with quick buttons in play; refresh keeps score", async ({ page }) => {
+  test("awards points with the single award button in play; refresh keeps score", async ({ page }) => {
     await setupContest(page, 2, ["ana"]);
     const firstCard = page.locator("#board .card").first();
-    await firstCard.locator('.points-row [data-delta="1"]').click();
-    await firstCard.locator('.points-row [data-delta="-1"]').click();
-    await firstCard.locator('.points-row [data-delta="1"]').click();
+    // the −1 button is gone; one award button (+1) is the whole points-row
+    await expect(page.locator('[data-delta="-1"]')).toHaveCount(0);
+    await firstCard.locator('[data-action="award"]').click();
     await expect(firstCard.locator(".score")).toHaveText("1");
 
     // no custom points field in play
@@ -73,7 +75,7 @@ test.describe("contest board end-to-end", () => {
 
   test("end contest announces the winner and archives the play back home", async ({ page }) => {
     await setupContest(page, 2, ["ana", "brie"]);
-    await page.locator("#board .card").first().locator('.points-row [data-delta="1"]').click();
+    await page.locator("#board .card").first().locator('[data-action="award"]').click();
     await page.locator("#end-contest").click();
 
     await expect(page.locator("#winner")).toBeVisible();
@@ -119,5 +121,120 @@ test.describe("contest board end-to-end", () => {
     await setupContest(page, 6, ["p"]);
     await expect(page.locator('.board-row[data-row="0"] .card')).toHaveCount(3);
     await expect(page.locator('.board-row[data-row="1"] .card')).toHaveCount(3);
+  });
+});
+
+// Franja de pregunta: máquina de estados del concurso en la vista de juego
+// (borrador → en directo → puntuado/expirado → siguiente pregunta).
+test.describe("franja de pregunta en la vista de juego", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => {
+      for (const key of ["contestBoard:current", "contestBoard:history"]) {
+        window.localStorage.removeItem(key);
+      }
+    });
+    await page.reload();
+    await page.locator("#fresh-session").click();
+    await expect(page.locator("#view-setup")).toBeVisible();
+  });
+
+  async function launchQuestion(page, question, seconds) {
+    await page.locator("#q-input").fill(question);
+    await page.locator("#q-seconds").fill(String(seconds));
+    await page.locator("#launch-question").click();
+    await expect(page.locator("#q-live")).toBeVisible();
+    await expect(page.locator("#q-text")).toHaveText(question);
+  }
+
+  test("la pregunta aparece con cuenta atrás y se para al puntuar", async ({ page }) => {
+    await setupContest(page, 2, ["ana"]);
+    await expect(page.locator("#q-strip")).toBeVisible();
+    await expect(page.locator("#q-draft")).toBeVisible();
+    // empty draft: the strip blocks the launch with a toast
+    await page.locator("#launch-question").click();
+    await expect(page.locator("#toast.show")).toContainText("Pregunta vacía");
+
+    await launchQuestion(page, "¿Cuál es la capital de Perú?", 5);
+    const timer = page.locator("#q-timer");
+    const before = Number(await timer.textContent());
+    expect(before).toBeGreaterThanOrEqual(4);
+    await page.waitForTimeout(1100);
+    expect(Number(await timer.textContent())).toBeLessThan(before);
+
+    // awarding the first card stops the countdown for good
+    const firstCard = page.locator("#board .card").first();
+    await firstCard.locator('[data-action="award"]').click();
+    await expect(page.locator("#q-after")).toBeVisible();
+    await expect(page.locator("#q-result")).toContainText("¡Punto para ");
+    await expect(page.locator("#q-live")).toBeHidden();
+    await expect(firstCard.locator(".score")).toHaveText("1");
+    await page.waitForTimeout(2000);
+    await expect(page.locator("#q-live")).toBeHidden();
+  });
+
+  test("varios puntos en la misma pregunta repiten celebración y actualizan el mensaje", async ({ page }) => {
+    await setupContest(page, 2, ["ana"]);
+    await launchQuestion(page, "¿Quién escribió El Quijote?", 5);
+    const cards = page.locator("#board .card");
+    const names = await cards.locator(".card-head h3").allTextContents();
+
+    await cards.nth(0).locator('[data-action="award"]').click();
+    await expect(page.locator("#q-result")).toHaveText(`¡Punto para ${names[0]}!`);
+    await cards.nth(1).locator('[data-action="award"]').click();
+    await expect(page.locator("#q-result")).toHaveText(`¡Punto para ${names[1]}!`);
+    await expect(cards.nth(0).locator(".score")).toHaveText("1");
+    await expect(cards.nth(1).locator(".score")).toHaveText("1");
+  });
+
+  test("deshacer revierte el ultimo punto", async ({ page }) => {
+    await setupContest(page, 2, ["ana"]);
+    await launchQuestion(page, "¿Cuántos continentes hay?", 5);
+    const firstCard = page.locator("#board .card").first();
+    await firstCard.locator('[data-action="award"]').click();
+    await expect(firstCard.locator(".score")).toHaveText("1");
+    await expect(page.locator("#undo-award")).toBeEnabled();
+
+    await page.locator("#undo-award").click();
+    // the score returns to its previous value; the strip message loses the
+    // award text (its source) and nothing is left to undo
+    await expect(firstCard.locator(".score")).toHaveText("0");
+    await expect(page.locator("#q-result")).toHaveText("");
+    await expect(page.locator("#undo-award")).toBeDisabled();
+  });
+
+  test("la pregunta sobrevive a un refresco y el tiempo reinicia", async ({ page }) => {
+    await setupContest(page, 2, ["ana"]);
+    await launchQuestion(page, "¿En qué año estamos?", 30);
+    await page.waitForTimeout(1000);
+    await page.reload();
+    await page.locator("#continue-session").click();
+    await expect(page.locator("#view-play")).toBeVisible();
+    await expect(page.locator("#q-live")).toBeVisible();
+    await expect(page.locator("#q-text")).toHaveText("¿En qué año estamos?");
+    // the countdown restarts at its initial value after the refresh
+    await expect(page.locator("#q-timer")).toHaveText("30");
+  });
+
+  test("sesion antigua sin ronda sigue cargando", async ({ page }) => {
+    await page.addInitScript(() => {
+      const legacy = {
+        startedAt: Date.now(),
+        phase: "playing",
+        startHue: 180,
+        groups: [
+          { id: "ga", name: "azul", members: ["ana"], points: 0 },
+          { id: "gb", name: "rojo", members: ["brie"], points: 0 },
+        ],
+      };
+      window.localStorage.setItem("contestBoard:current", JSON.stringify(legacy));
+    });
+    await page.goto("/");
+    await page.locator("#continue-session").click();
+    await expect(page.locator("#view-play")).toBeVisible();
+    await expect(page.locator("#board .card")).toHaveCount(2);
+    // the redesign hydrates the missing round into the draft strip
+    await expect(page.locator("#q-strip")).toBeVisible();
+    await expect(page.locator("#q-draft")).toBeVisible();
   });
 });

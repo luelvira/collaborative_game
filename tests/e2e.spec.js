@@ -141,9 +141,9 @@ test("play board is score-only, end archives and returns home", async ({ page })
   // custom points input must be gone
   await expect(page.locator("#board .card [data-custom-input]")).toHaveCount(0);
 
-  // +1 works and persists the score
+  // +1 works and persists the score (single award button since Task 3)
   const firstCard = page.locator("#board .card").first();
-  await firstCard.locator('.points-row [data-delta="1"]').click();
+  await firstCard.locator('[data-action="award"]').click();
   await expect(firstCard.locator(".score")).toHaveText("2");
 
   // end contest -> winner overlay

@@ -6,14 +6,256 @@ import * as lib from "./lib.js";
 export const api = { ...lib };
 
 const CURRENT_KEY = "contestBoard:current";
+const SOUND_KEY = "contestBoard:soundOn";
 const $ = (sel) => document.querySelector(sel);
 const els = {};
+
+// Task 4 seam: the sound module does not exist yet. Task 4 fills these two
+// bodies (import { sound } from "./sound.js") without touching call sites.
+function notifyExpiry() {}
+function notifyAward() {}
+
+// Question strip timing — never persisted: a refresh restarts the countdown
+// in full (spec decision), and expiry must not re-fire after a reload.
+let roundStartAt = 0;
+let tickTimer = null;
+// True once the current round hit the countdown, so an answered round keeps
+// "⏱ ¡Tiempo!" as its source message after every award has been undone.
+let expiredThisRound = false;
 
 let state;
 
 function persist() {
   if (state) {
     localStorage.setItem(CURRENT_KEY, api.serialize(state));
+  }
+}
+
+function clampSeconds(raw) {
+  const n = Math.round(Number(raw));
+  if (!Number.isFinite(n)) return 30;
+  return Math.min(300, Math.max(5, n || 30));
+}
+
+function stopRoundTick() {
+  if (tickTimer !== null) {
+    clearInterval(tickTimer);
+    tickTimer = null;
+  }
+}
+
+function startRoundTick() {
+  stopRoundTick();
+  roundStartAt = Date.now();
+  tickTimer = setInterval(onRoundTick, 200);
+}
+
+function onRoundTick() {
+  if (!state || state.phase !== "playing" || state.round?.phase !== "live") {
+    stopRoundTick();
+    return;
+  }
+  const total = clampSeconds(state.round.seconds) * 1000;
+  const remaining = total - (Date.now() - roundStartAt);
+  if (remaining <= 0) {
+    stopRoundTick();
+    const res = api.expireRound(state);
+    if (res && res.error) return;
+    expiredThisRound = true;
+    persist();
+    renderStrip();
+    notifyExpiry();
+    return;
+  }
+  paintQTimer(remaining, total);
+}
+
+function paintQTimer(remaining, total) {
+  const timer = $("#q-timer");
+  const bar = $("#q-bar");
+  if (timer) timer.textContent = String(Math.ceil(remaining / 1000));
+  if (bar) bar.style.width = `${Math.max(0, Math.min(1, remaining / total)) * 100}%`;
+}
+
+// Message of the after-view: the most recent award on the undo log wins; an
+// empty log returns the round to its source message (the time out, or nothing
+// at all when the point came before any question was launched).
+function afterMessage() {
+  const round = state.round;
+  const last = round.undoLog[round.undoLog.length - 1];
+  if (last) {
+    const name = api.groupName(state.startHue, state.groups, last.groupId);
+    return { text: `¡Punto para ${name}!`, kind: "award" };
+  }
+  if (round.phase === "expired" || expiredThisRound) {
+    return { text: "⏱ ¡Tiempo!", kind: "expired" };
+  }
+  return { text: "", kind: "none" };
+}
+
+// Single source of truth for the strip: visibility follows the contest phase,
+// the sub-view follows the round phase. Safe to call on every board refresh.
+function renderStrip() {
+  const strip = $("#q-strip");
+  if (!strip) return;
+  if (state.phase !== "playing") {
+    stopRoundTick();
+    strip.hidden = true;
+    return;
+  }
+  const round = state.round ?? (state.round = api.initialRound());
+  strip.hidden = false;
+  let sub = "after";
+  if (round.phase === "draft" || round.phase === "live") sub = round.phase;
+  strip.dataset.e = round.phase;
+  for (const id of ["q-draft", "q-live", "q-after"]) {
+    const subView = $(`#${id}`);
+    if (subView) subView.hidden = id !== `q-${sub}`;
+  }
+  if (sub === "draft") {
+    stopRoundTick();
+    const secs = $("#q-seconds");
+    // Prefill from the round; never clobber text the teacher is already typing.
+    if (secs && secs.value !== String(clampSeconds(round.seconds))) {
+      secs.value = String(clampSeconds(round.seconds));
+    }
+    return;
+  }
+  if (sub === "live") {
+    if (tickTimer === null) startRoundTick();
+    const qText = $("#q-text");
+    if (qText && qText.textContent !== round.question) {
+      qText.textContent = round.question;
+    }
+    const total = clampSeconds(round.seconds) * 1000;
+    paintQTimer(Math.max(0, total - (Date.now() - roundStartAt)), total);
+    return;
+  }
+  stopRoundTick();
+  const msg = afterMessage();
+  const result = $("#q-result");
+  if (result) {
+    result.textContent = msg.text;
+    result.classList.toggle("q-ok", msg.kind === "award");
+    result.classList.toggle("q-bad", msg.kind === "expired");
+  }
+  const undo = $("#undo-award");
+  if (undo) undo.disabled = round.undoLog.length === 0;
+}
+
+// The awarded card fills flat with its team color, the rest of the board dims
+// for the same 900 ms, and 8 colored squares drop inside the card. Color-on /
+// color-off only (no gradients, no shadows); under prefers-reduced-motion the
+// classes are removed synchronously so nothing animates.
+function celebrate(card) {
+  const board = $("#board");
+  if (!card || !board) return;
+  const reduced =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  card.classList.add("flash");
+  board.classList.add("celebrating");
+  const confetti = [];
+  if (!reduced) {
+    const team = api.colorFor(state.startHue, state.groups, card.dataset.groupId);
+    const colors = [team, "var(--color-accent)", "var(--color-text)", "var(--color-success)"];
+    for (let i = 0; i < 8; i++) {
+      const square = document.createElement("span");
+      square.className = "confetti";
+      square.style.left = `${8 + i * 11 + Math.round(Math.random() * 5)}%`;
+      square.style.top = `${Math.round(Math.random() * 26)}%`;
+      square.style.background = colors[i % colors.length];
+      square.style.animationDelay = `${(i % 4) * 70}ms`;
+      card.append(square);
+      confetti.push(square);
+    }
+  }
+  const clean = () => {
+    card.classList.remove("flash");
+    board.classList.remove("celebrating");
+    confetti.forEach((square) => square.remove());
+  };
+  if (reduced) clean();
+  else setTimeout(clean, 900);
+}
+
+// Sound toggle: persistence only here — Task 4's sound.js reads the same key.
+function soundOn() {
+  return localStorage.getItem(SOUND_KEY) !== "0";
+}
+
+function updateSoundToggle() {
+  const btn = $("#sound-toggle");
+  if (!btn) return;
+  const on = soundOn();
+  btn.textContent = on ? "🔊" : "🔇";
+  btn.setAttribute("aria-label", on ? "Sonido activado" : "Sonido desactivado");
+}
+
+function wireSound() {
+  const btn = $("#sound-toggle");
+  if (!btn) return;
+  updateSoundToggle();
+  btn.addEventListener("click", () => {
+    localStorage.setItem(SOUND_KEY, soundOn() ? "0" : "1");
+    updateSoundToggle();
+  });
+}
+
+function wireStrip() {
+  const form = $("#q-draft");
+  if (form) {
+    form.addEventListener(
+      "submit",
+      on((event) => {
+        event.preventDefault();
+        if (state.phase !== "playing") return;
+        const input = $("#q-input");
+        const text = (input?.value ?? "").trim();
+        if (!text) return toast("Pregunta vacía");
+        const seconds = clampSeconds($("#q-seconds")?.value);
+        const round = state.round ?? (state.round = api.initialRound(seconds));
+        // lib has no action for the countdown length; clamp it here so a
+        // hand-typed value can never send the timer outside 5..300.
+        round.seconds = seconds;
+        const q = api.setQuestion(state, text);
+        if (q && q.error) return toast(q.error);
+        const r = api.startRound(state);
+        if (r && r.error) return toast(r.error);
+        expiredThisRound = false;
+        persist();
+        input.value = "";
+        renderStrip();
+      }, "Pregunta"),
+    );
+  }
+  const undo = $("#undo-award");
+  if (undo) {
+    undo.addEventListener(
+      "click",
+      on(() => {
+        const res = api.undoLastAward(state);
+        if (res && res.error) return toast(res.error);
+        persist();
+        renderBoard();
+      }, "Deshacer"),
+    );
+  }
+  const next = $("#next-question");
+  if (next) {
+    next.addEventListener(
+      "click",
+      on(() => {
+        const res = api.nextQuestion(state);
+        if (res && res.error) return toast(res.error);
+        persist();
+        const input = $("#q-input");
+        if (input) input.value = "";
+        renderBoard();
+        // The next question is typed right away; put the cursor there.
+        input?.focus();
+      }, "Siguiente"),
+    );
   }
 }
 
@@ -209,15 +451,14 @@ function cardTemplatePlay(group) {
   card.className = "card card-enter";
   card.dataset.groupId = group.id;
   card.innerHTML = `
-    <div class="chip"></div>
     <div class="card-body">
       <div class="card-head">
         <h3></h3>
+        <span class="crown"></span>
       </div>
       <div class="score"></div>
       <div class="points-row">
-        <button type="button" class="plus" data-action="points" data-delta="1">+1</button>
-        <button type="button" class="minus" data-action="points" data-delta="-1">−1</button>
+        <button type="button" class="plus" data-action="award">+1</button>
       </div>
       <ul class="members"></ul>
       <span class="empty-hint" hidden>No members yet</span>
@@ -228,11 +469,24 @@ function cardTemplatePlay(group) {
 
 function patchCardPlay(card, group, { isNew = false } = {}) {
   const color = api.colorFor(state.startHue, state.groups, group.id);
-  const chip = card.querySelector(".chip");
-  if (chip) chip.style.background = color;
+  // Team identity as flat color: the thick top border is the label, and the
+  // CSS var feeds the award flash (the card fills with the same color).
+  if (card.style.getPropertyValue("--team-color") !== color) {
+    card.style.setProperty("--team-color", color);
+  }
+  card.style.borderTop = `10px solid ${color}`;
   const h3 = card.querySelector(".card-head h3");
   if (h3) {
     h3.textContent = api.groupName(state.startHue, state.groups, group.id);
+  }
+  const crownEl = card.querySelector(".crown");
+  if (crownEl) {
+    // Decorative leader crown: strict leader with at least one point.
+    const leaderIds = api.winners(state);
+    const isLeader = leaderIds.length === 1 && leaderIds[0] === group.id && group.points > 0;
+    if (crownEl.textContent !== (isLeader ? "👑" : "")) {
+      crownEl.textContent = isLeader ? "👑" : "";
+    }
   }
 
   const scoreNode = card.querySelector(".score");
@@ -314,6 +568,7 @@ function renderBoard() {
   });
 
   updatePlayChrome();
+  renderStrip();
 }
 
 function updatePlayChrome() {
@@ -517,15 +772,19 @@ function wirePlay() {
       if (!card) return;
       const groupId = card.dataset.groupId;
       const action = target.dataset.action;
-      if (action === "points") {
-        const delta = Number(target.dataset.delta);
-        const res = api.addPoints(state, groupId, delta);
+      if (action === "award") {
+        // Awarding IS stopping: the countdown never comes back this round,
+        // not even for the first award.
+        stopRoundTick();
+        const res = api.awardPoints(state, groupId, 1);
         if (res && res.error) {
           toast(res.error);
           return;
         }
         persist();
         renderBoard();
+        celebrate(card);
+        notifyAward();
         return;
       }
     });
@@ -589,6 +848,8 @@ function boot() {
   wireSetup();
   wirePlay();
   wireOverlay();
+  wireStrip();
+  wireSound();
 
   // Expose for tests
   window.__contestApi = api;
