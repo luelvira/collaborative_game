@@ -191,6 +191,26 @@ test("board uses two .board-row containers and centered rows", async ({ page }) 
   await expect(page.locator('.board-row[data-row="1"] .card')).toHaveCount(2);
 });
 
+test("decorative stripes live in a non-scrolling layer (scroll fluidity)", async ({ page }) => {
+  await page.goto("/");
+  // Root cause: the -18deg repeating stripe gradient, painted as part of the
+  // scroll-tied body background, is re-rasterized on every scroll and makes
+  // the page (and its animations) feel slow on low-end machines. The pattern
+  // must be rasterized once inside a fixed-position layer instead.
+  const styles = await page.evaluate(() => {
+    const body = getComputedStyle(document.body);
+    const before = getComputedStyle(document.body, "::before");
+    return {
+      bodyImage: body.backgroundImage,
+      beforePosition: before.position,
+      beforeImage: before.backgroundImage,
+    };
+  });
+  expect(styles.bodyImage).not.toContain("repeating-linear-gradient");
+  expect(styles.beforePosition).toBe("fixed");
+  expect(styles.beforeImage).toContain("repeating-linear-gradient");
+});
+
 test("board uses one .board-row containers and centered rows", async ({ page }) => {
   await page.goto("/");
   await page.addInitScript(() => {

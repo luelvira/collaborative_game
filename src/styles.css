@@ -39,14 +39,25 @@
     background-color: var(--color-ink);
     background-image:
       radial-gradient(ellipse at 50% 0%, rgb(34 211 238 / 0.08), transparent 55%),
-      repeating-linear-gradient(
-        -18deg,
-        transparent,
-        transparent 22px,
-        rgb(163 255 18 / 0.02) 22px,
-        rgb(163 255 18 / 0.02) 23px
-      ),
       linear-gradient(165deg, var(--color-ink-mid), var(--color-ink) 65%, #030308);
+  }
+
+  /* The -18deg stripe pattern is painted in a fixed, non-scrolling layer so
+     it rasterizes once instead of repainting on every scroll step (which made
+     both scrolling and animations run slow on low-end machines). */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: repeating-linear-gradient(
+      -18deg,
+      transparent,
+      transparent 22px,
+      rgb(163 255 18 / 0.02) 22px,
+      rgb(163 255 18 / 0.02) 23px
+    );
   }
 
   button,
