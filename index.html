@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contest Board</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🏆</text></svg>">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>🏆 Contest Board</h1>
+    <div class="controls">
+      <div class="control">
+        <label for="group-name">New group</label>
+        <input id="group-name" type="text" placeholder="Group name" maxlength="20">
+        <button type="button" id="add-group">Add group</button>
+      </div>
+      <div class="control">
+        <label for="user-name">Add user</label>
+        <input id="user-name" type="text" placeholder="Name" maxlength="30">
+        <button type="button" id="add-user">Add user</button>
+      </div>
+      <button type="button" id="end-contest" class="danger">End contest</button>
+    </div>
+  </header>
+
+  <main id="board" class="board" aria-live="polite"></main>
+
+  <section id="history" class="history" hidden></section>
+
+  <div id="winner" class="overlay" hidden>
+    <div class="podium">
+      <p class="podium-title">Winner</p>
+      <h2 id="winner-name"></h2>
+      <ul id="winner-members"></ul>
+      <p id="runner-up" class="runner-up"></p>
+      <button type="button" id="reset" class="danger">Reset to start a new contest</button>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
