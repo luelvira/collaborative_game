@@ -379,10 +379,6 @@
     text-shadow: 0 0 40px rgb(34 211 238 / 0.35);
   }
 
-  .score.tick {
-    animation: score-tick 0.22s ease;
-  }
-
   .points-row {
     display: flex;
     gap: 0.45rem;
@@ -605,12 +601,6 @@
   }
 }
 
-@keyframes score-tick {
-  from {
-    transform: scale(1.08);
-  }
-}
-
 @keyframes overlay-in {
   from {
     opacity: 0;
@@ -656,7 +646,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .card.card-enter,
-  .score.tick,
   .overlay,
   button {
     animation: none !important;

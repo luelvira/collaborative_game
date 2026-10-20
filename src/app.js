@@ -223,11 +223,6 @@ function patchCardPlay(card, group, { isNew = false } = {}) {
     const nextScore = String(group.points);
     if (scoreNode.textContent !== nextScore) {
       scoreNode.textContent = nextScore;
-      if (!isNew) {
-        scoreNode.classList.remove("tick");
-        void scoreNode.offsetWidth;
-        scoreNode.classList.add("tick");
-      }
     }
   }
 
