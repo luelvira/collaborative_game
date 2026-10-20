@@ -43,6 +43,70 @@ function seedThreeGroupsSevenUsers() {
   return s;
 }
 
+function frozenSeed() {
+  const s = seedThreeGroupsSevenUsers();
+  s.phase = "frozen";
+  return s;
+}
+
+test("end contest freezes the board and shows tied winners", async () => {
+  const { document, window, store, cleanup } = bootWithSeededState(seedThreeGroupsSevenUsers);
+  try {
+    await appModule();
+    document.querySelector("#end-contest").dispatchEvent(new window.Event("click", { bubbles: true }));
+    assert.equal(document.querySelector("#winner").hidden, false);
+    assert.match(document.querySelector("#winner-name").textContent, /Alpha.*Charlie|Charlie.*Alpha/);
+    const cards = document.querySelectorAll("#board .card");
+    for (const card of cards) {
+      for (const btn of card.querySelectorAll("button")) assert.equal(btn.disabled, true);
+    }
+    assert.equal(document.querySelector("#add-user").disabled, true);
+    const persisted = JSON.parse(store.get("contestBoard:current"));
+    assert.equal(persisted.phase, "frozen");
+  } finally {
+    cleanup();
+  }
+});
+
+test("reset archives the play with start timestamp and restarts", async () => {
+  const { document, window, store, cleanup } = bootWithSeededState(seedThreeGroupsSevenUsers);
+  try {
+    await appModule();
+    document.querySelector("#end-contest").dispatchEvent(new window.Event("click", { bubbles: true }));
+    const realConfirm = window.confirm;
+    window.confirm = () => true;
+    document.querySelector("#reset").dispatchEvent(new window.Event("click", { bubbles: true }));
+    window.confirm = realConfirm;
+    const runs = JSON.parse(store.get("contestBoard:history"));
+    assert.equal(runs.length, 1);
+    assert.ok(runs[0].startedAt > 0 && runs[0].endedAt >= runs[0].startedAt);
+    assert.ok([1, 2].includes(runs[0].winners.length));
+    const fresh = JSON.parse(store.get("contestBoard:current"));
+    assert.equal(fresh.phase, "setup");
+    assert.equal(fresh.groups.length, 0);
+    assert.ok(fresh.startedAt > runs[0].startedAt);
+    assert.equal(document.querySelector("#winner").hidden, true);
+    assert.equal(document.querySelector("#history").hidden, false);
+    assert.match(document.querySelector("#history").textContent, /Winner/);
+  } finally {
+    cleanup();
+  }
+});
+
+test("loading a frozen state after refresh restores the winner view", async () => {
+  const { document, cleanup } = bootWithSeededState(frozenSeed);
+  try {
+    await appModule();
+    assert.equal(document.querySelector("#winner").hidden, false);
+    const cards = document.querySelectorAll("#board .card");
+    for (const card of cards) {
+      for (const btn of card.querySelectorAll("button")) assert.equal(btn.disabled, true);
+    }
+  } finally {
+    cleanup();
+  }
+});
+
 test("boot renders one card per stored group with score and chip", async () => {
   const { document, store, cleanup } = bootWithSeededState(seedThreeGroupsSevenUsers);
   try {

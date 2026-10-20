@@ -9,6 +9,9 @@ import {
   serialize,
   deserialize,
   loadHistory,
+  saveHistory,
+  archiveRun,
+  winners,
 } from "./lib.js";
 
 const CURRENT_KEY = "contestBoard:current";
@@ -44,6 +47,11 @@ function boot() {
     ["addUser", "#add-user"],
     ["endContest", "#end-contest"],
     ["history", "#history"],
+    ["winner", "#winner"],
+    ["winnerName", "#winner-name"],
+    ["winnerMembers", "#winner-members"],
+    ["runnerUp", "#runner-up"],
+    ["reset", "#reset"],
   ].forEach(([key, sel]) => (els[key] = $(sel)));
 
   const raw = localStorage.getItem(CURRENT_KEY);
@@ -60,7 +68,9 @@ function boot() {
   }
   renderBoard();
   renderHistory();
+  if (state.phase === "frozen") renderWinner();
   wireTopBar();
+  wireOverlay();
 }
 
 function cardTemplate(group, color) {
@@ -127,7 +137,13 @@ function cardTemplate(group, color) {
   });
 
   render();
+  setCardDisabled(card, state.phase === "frozen");
   return card;
+}
+
+function setCardDisabled(card, disabled) {
+  card.querySelectorAll("button").forEach((b) => (b.disabled = disabled));
+  card.querySelectorAll("input").forEach((i) => (i.disabled = disabled));
 }
 
 function renderBoard() {
@@ -136,7 +152,12 @@ function renderBoard() {
     const color = colorFor(state.startHue, state.groups, group.id);
     els.board.append(cardTemplate(group, color));
   });
-  els.endContest.disabled = state.groups.length === 0;
+  const frozen = state.phase === "frozen";
+  els.endContest.disabled = state.groups.length === 0 || frozen;
+  els.addGroup.disabled = frozen;
+  els.addUser.disabled = frozen;
+  els.groupName.disabled = frozen;
+  els.userName.disabled = frozen;
 }
 
 function renderHistory() {
@@ -165,8 +186,55 @@ function renderHistory() {
   els.history.querySelector("h2").textContent = "Past plays";
 }
 
+function renderWinner() {
+  const winnerIds = winners(state);
+  const names = winnerIds
+    .map((id) => state.groups.find((g) => g.id === id)?.name)
+    .filter(Boolean);
+  els.winnerName.textContent = names.join(" & ");
+  const membersList = els.winnerMembers;
+  membersList.replaceChildren();
+  state.groups
+    .filter((g) => winnerIds.includes(g.id))
+    .forEach((g) =>
+      g.members.forEach((name) => {
+        const li = document.createElement("li");
+        li.textContent = name;
+        membersList.append(li);
+      }),
+    );
+  const rest = state.groups
+    .filter((g) => !winnerIds.includes(g.id))
+    .map((g) => `${g.name} (${g.points})`)
+    .join(", ");
+  els.runnerUp.textContent = rest ? `Runner-up: ${rest}` : "";
+  els.winner.hidden = false;
+}
+
+function endContest() {
+  if (state.phase === "frozen") return;
+  if (state.groups.length === 0) return toast("Add at least one group first");
+  state.phase = "frozen";
+  persist();
+  renderBoard();
+  renderWinner();
+}
+
+function resetContest() {
+  if (!window.confirm("Archive this play and start a new contest?")) return;
+  const runs = loadHistory(localStorage);
+  runs.push(archiveRun(state));
+  saveHistory(localStorage, runs);
+  state = newState();
+  persist();
+  els.winner.hidden = true;
+  renderBoard();
+  renderHistory();
+}
+
 // Runs a lib action; on error shows feedback, on success persists + re-renders.
 function act(action) {
+  if (state.phase === "frozen") return toast("Contest is over — reset to start a new one");
   const result = action();
   if (result && result.error) {
     toast(result.error);
@@ -200,6 +268,11 @@ function wireTopBar() {
   els.userName.addEventListener("keydown", (e) => {
     if (e.key === "Enter") addNamedUser();
   });
+}
+
+function wireOverlay() {
+  els.endContest.addEventListener("click", endContest);
+  els.reset.addEventListener("click", resetContest);
 }
 
 boot();
