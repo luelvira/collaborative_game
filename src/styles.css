@@ -342,7 +342,12 @@
   }
 
   .card.card-enter {
-    animation: card-in 0.28s ease;
+    animation: card-in 0.34s cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+
+  /* Gentle fade+rise when a view is unhidden (home → setup → play). */
+  .view {
+    animation: view-in 0.24s cubic-bezier(0.2, 0.7, 0.3, 1);
   }
 
   .chip {
@@ -492,12 +497,16 @@
     background:
       radial-gradient(ellipse at 50% 20%, rgb(34 211 238 / 0.25), transparent 55%),
       radial-gradient(ellipse at 50% 80%, rgb(255 63 191 / 0.18), transparent 60%),
-      rgb(5 5 16 / 0.95);
+      rgb(5 5 16 / 0.82);
     backdrop-filter: blur(8px);
     display: grid;
     place-items: center;
     padding: 1.5rem;
-    animation: overlay-in 0.32s ease;
+    /* Semi-translucent backdrop keeps the board visibly responsive to scroll;
+       the overlay itself scrolls when the podium is taller than the viewport,
+       instead of swallowing the document scroll. */
+    overflow-y: auto;
+    animation: overlay-in 0.45s cubic-bezier(0.2, 0.7, 0.3, 1);
   }
 
   .podium {
@@ -509,6 +518,7 @@
     background: linear-gradient(180deg, rgb(16 16 24 / 0.95), rgb(10 10 20 / 0.98));
     border-radius: 16px;
     border: 1px solid rgb(34 211 238 / 0.4);
+    animation: podium-in 0.45s cubic-bezier(0.2, 0.7, 0.3, 1);
   }
 
   .podium-title {
@@ -612,7 +622,21 @@
 
 @keyframes card-in {
   from {
-    transform: translateY(8px) scale(0.97);
+    transform: translateY(6px) scale(0.985);
+    opacity: 0;
+  }
+}
+
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes podium-in {
+  from {
+    transform: translateY(16px) scale(0.98);
     opacity: 0;
   }
 }
@@ -663,6 +687,8 @@
 @media (prefers-reduced-motion: reduce) {
   .card.card-enter,
   .overlay,
+  .podium,
+  .view,
   button {
     animation: none !important;
     transition: none !important;

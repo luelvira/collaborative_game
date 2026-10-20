@@ -190,26 +190,6 @@ test("board uses two .board-row containers and centered rows", async ({ page }) 
   await expect(page.locator('.board-row[data-row="1"] .card')).toHaveCount(2);
 });
 
-test("decorative stripes live in a non-scrolling layer (scroll fluidity)", async ({ page }) => {
-  await page.goto("/");
-  // Root cause: the -18deg repeating stripe gradient, painted as part of the
-  // scroll-tied body background, is re-rasterized on every scroll and makes
-  // the page (and its animations) feel slow on low-end machines. The pattern
-  // must be rasterized once inside a fixed-position layer instead.
-  const styles = await page.evaluate(() => {
-    const body = getComputedStyle(document.body);
-    const before = getComputedStyle(document.body, "::before");
-    return {
-      bodyImage: body.backgroundImage,
-      beforePosition: before.position,
-      beforeImage: before.backgroundImage,
-    };
-  });
-  expect(styles.bodyImage).not.toContain("repeating-linear-gradient");
-  expect(styles.beforePosition).toBe("fixed");
-  expect(styles.beforeImage).toContain("repeating-linear-gradient");
-});
-
 test("board uses one .board-row containers and centered rows", async ({ page }) => {
   await page.goto("/");
   await page.addInitScript(() => {
@@ -232,4 +212,80 @@ test("board uses one .board-row containers and centered rows", async ({ page }) 
 
   await expect(page.locator(".board-row")).toHaveCount(1);
   await expect(page.locator('.board-row[data-row="0"] .card')).toHaveCount(2);
+});
+
+test("decorative stripes live in a non-scrolling layer (scroll fluidity)", async ({ page }) => {
+  await page.goto("/");
+  // Root cause: the -18deg repeating stripe gradient, painted as part of the
+  // scroll-tied body background, is re-rasterized on every scroll and makes
+  // the page (and its animations) feel slow on low-end machines. The pattern
+  // must be rasterized once inside a fixed-position layer instead.
+  const styles = await page.evaluate(() => {
+    const body = getComputedStyle(document.body);
+    const before = getComputedStyle(document.body, "::before");
+    return {
+      bodyImage: body.backgroundImage,
+      beforePosition: before.position,
+      beforeImage: before.backgroundImage,
+    };
+  });
+  expect(styles.bodyImage).not.toContain("repeating-linear-gradient");
+  expect(styles.beforePosition).toBe("fixed");
+  expect(styles.beforeImage).toContain("repeating-linear-gradient");
+});
+
+test("winner overlay is light enough to see scroll behind and scrolls itself if tall", async ({ page }) => {
+  await page.goto("/");
+  // Root cause: a near-opaque (0.95) fullscreen overlay makes any page scroll
+  // behind it invisible, so scrolling *feels* blocked while the winner screen
+  // is up. The overlay must stay translucent and be able to scroll its own
+  // content on short screens instead of swallowing the document scroll.
+  await page.addInitScript(() => {
+    const state = {
+      startedAt: Date.now(),
+      phase: "playing",
+      startHue: 180,
+      groups: Array.from({ length: 10 }, (_, i) => ({
+        id: `g${i}`,
+        name: `G${i}`,
+        members: ["p"],
+        points: 0,
+      })),
+    };
+    localStorage.setItem("contestBoard:current", JSON.stringify(state));
+  });
+  await page.goto("/");
+  await page.locator("#continue-session").click();
+  await page.locator("#view-play").waitFor({ state: "visible" });
+  const scrollBefore = await page.evaluate(() => window.scrollY);
+  await page.locator("#end-contest").click();
+  await page.locator("#winner").waitFor({ state: "visible" });
+  await page.mouse.move(640, 400);
+  await page.mouse.wheel(0, 400);
+  await page.waitForTimeout(300);
+  const scrolled = await page.evaluate(() => window.scrollY);
+
+  const overlay = await page.evaluate(() => {
+    const s = getComputedStyle(document.getElementById("winner"));
+    const alpha = s.backgroundColor.match(/[\d.]+\)$/)?.[0];
+    return { bg: s.backgroundColor, overflow: s.overflowY };
+  });
+  expect(overlay.overflow).toBe("auto");
+  // translucency: bg alpha below 0.9 so motion behind is perceptible
+  const a = Number(overlay.bg.match(/[\d.]+/g)?.slice(-1)[0]);
+  expect(a).toBeLessThan(0.9);
+  // real wheel over the overlay must still move the document behind
+  expect(scrolled).toBeGreaterThan(scrollBefore);
+});
+
+test("views fade in when shown", async ({ page }) => {
+  await page.goto("/");
+  const viewAnim = await page.evaluate(() => {
+    const s = getComputedStyle(document.querySelector("#view-home"));
+    return { name: s.animationName, duration: parseFloat(s.animationDuration) };
+  });
+  // Smoothness: a real (non-none) fade animation shorter than half a second.
+  expect(viewAnim.name).not.toBe("none");
+  expect(viewAnim.duration).toBeGreaterThan(0);
+  expect(viewAnim.duration).toBeLessThanOrEqual(0.5);
 });
