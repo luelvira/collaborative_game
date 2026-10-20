@@ -5,25 +5,61 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Contest Board</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🏆</text></svg>">
-  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="topbar">
-    <h1>🏆 Contest Board</h1>
-    <div class="controls">
-      <button type="button" id="add-group">Add group</button>
-      <div class="control">
-        <label for="user-name">Add user</label>
-        <input id="user-name" type="text" placeholder="Name" maxlength="30">
-        <button type="button" id="add-user">Add user</button>
+  <section id="view-home" class="view view-home">
+    <div class="home-stage">
+      <p class="home-kicker">Live classroom contest</p>
+      <h1 class="home-title">Contest Board</h1>
+      <p class="home-sub">Project-ready scoreboard. Local to this browser.</p>
+      <div class="home-actions">
+        <button type="button" id="continue-session" class="primary home-btn">Continue last session</button>
+        <button type="button" id="fresh-session" class="home-btn">Start fresh gameplay</button>
       </div>
-      <button type="button" id="end-contest" class="danger">End contest</button>
+      <section id="history" class="history" hidden></section>
     </div>
-  </header>
+  </section>
 
-  <main id="board" class="board" aria-live="polite"></main>
+  <section id="view-setup" class="view view-setup" hidden>
+    <header class="topbar">
+      <div class="brand">
+        <h1>Contest Board</h1>
+        <p class="status">Choose groups, name them, add players</p>
+      </div>
+      <div class="controls">
+        <div class="control">
+          <label for="group-count">Groups</label>
+          <input id="group-count" type="number" min="2" max="6" step="1" value="2">
+        </div>
+        <div class="control">
+          <label for="user-name">Add player</label>
+          <div class="control-row">
+            <input id="user-name" type="text" placeholder="Name" maxlength="30">
+            <button type="button" id="add-user" class="primary">Add</button>
+          </div>
+        </div>
+        <button type="button" id="start-contest" class="primary">Start contest</button>
+        <button type="button" id="setup-home" class="ghost">Home</button>
+      </div>
+    </header>
+    <div id="setup-groups" class="setup-groups" aria-live="polite"></div>
+  </section>
 
-  <section id="history" class="history" hidden></section>
+  <section id="view-play" class="view view-play" hidden>
+    <header class="topbar">
+      <div class="brand">
+        <h1>Contest Board</h1>
+        <p id="status-line" class="status">Live</p>
+      </div>
+      <div class="controls">
+        <button type="button" id="end-contest" class="danger">End contest</button>
+      </div>
+    </header>
+    <main id="board" class="board" aria-live="polite">
+      <div class="board-row" data-row="0"></div>
+      <div class="board-row" data-row="1"></div>
+    </main>
+  </section>
 
   <div id="winner" class="overlay" hidden>
     <div class="podium">
@@ -31,11 +67,10 @@
       <h2 id="winner-name"></h2>
       <ul id="winner-members"></ul>
       <p id="runner-up" class="runner-up"></p>
-      <button type="button" id="reset" class="danger">Reset to start a new contest</button>
+      <button type="button" id="reset" class="danger">Archive &amp; return home</button>
     </div>
   </div>
 
-  <script src="lib.js"></script>
-  <script src="app.js"></script>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>

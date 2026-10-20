@@ -1,9 +1,12 @@
 # collaborative_game — Contest Board
 
-A single-page, zero-dependency web app for running a live classroom-style contest:
-how to split participants into groups, keep the groups balanced, award points, and
-declare a winner. Everything is stored locally in the browser — no server, no
-backend, no sign-in. Built with plain HTML/CSS/JavaScript.
+A single-page web app for running a live classroom-style contest: split
+participants into groups, keep the groups balanced, award points, and declare a
+winner. Everything is stored locally in the browser — no server, no backend, no
+sign-in.
+
+Built with plain HTML/CSS/JavaScript. **Vite** and **Tailwind CSS** are
+dev/build tools only; the deployed site has no runtime libraries.
 
 ## How does it work?
 
@@ -20,41 +23,46 @@ backend, no sign-in. Built with plain HTML/CSS/JavaScript.
 4. **End contest** freezes the board and announces the winner full-screen
    (ties are joint winners). Everyone's scores and groups are locked.
 5. **Reset to start a new contest** archives the finished play — with its start
-   timestamp and winner — into the "Past plays" list, then clears the board.
+   timestamp and winner — into the "Past plays" list (last 20 kept), then clears
+   the board.
 
 The current board also survives page refreshes: state is auto-saved to
 `localStorage` after every change. All data lives in *your* browser only.
 
-## Run it
-
-Double-click `index.html` — the page works straight from the file system
-(no server needed, `localStorage` included). Or serve the folder if you prefer:
+## Run it locally
 
 ```bash
-python3 -m http.server 8000
-# → http://localhost:8000
+npm install
+npm run dev
+# → http://localhost:5173
+```
+
+Production build and local preview:
+
+```bash
+npm run build
+npm run preview
 ```
 
 ## Tests
 
 ```bash
-node --test   # logic + UI (DOM via linkedom) tests; no packages to install by hand — `npm i` first
+npm test                 # logic + UI (DOM via linkedom)
+npm run test:e2e         # Playwright against vite preview
 ```
 
-`linkedom` is a dev-only dependency for testing the UI in Node. The deployed
-site itself uses no libraries at all.
+`linkedom`, Vite, Tailwind, and Playwright are **devDependencies** only.
 
 ## Hosting on GitHub Pages
 
-The site is fully static and needs no build step (`.nojekyll` is already
-included so GitHub serves files as-is):
+The repo ships a GitHub Action (`.github/workflows/pages.yml`) that builds with
+Vite and deploys the `dist/` folder:
 
-1. Push this repository to GitHub with the site files (`index.html`,
-   `styles.css`, `app.js`) at the **root of the `main` branch**.
+1. Push this repository to GitHub (site sources at the repo root).
 2. Go to **Settings → Pages**.
-3. Under **Build and deployment**, set **Source: Deploy from a branch**,
-   **Branch: `main`**, folder **`/ (root)`**, then **Save**.
-4. The site appears at `https://<your-username>.github.io/<repo-name>/`
+3. Under **Build and deployment**, set **Source: GitHub Actions**.
+4. Push to `main` (or run the **Deploy to GitHub Pages** workflow manually).
+5. The site appears at `https://<your-username>.github.io/collaborative_game/`
    (first deployment can take a couple of minutes).
 
 ---
