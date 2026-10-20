@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import "./lib.js";
 
 const {
@@ -7,6 +8,7 @@ const {
   colorFor,
   colorName,
   groupName,
+  makeId,
   pickGroup,
   newState,
   addGroup,
@@ -22,10 +24,20 @@ const {
   saveHistory,
 } = globalThis.ContestLib;
 
+test("makeId produces string ids from Math.random alone (no crypto, no secure context)", () => {
+  const ids = new Set(Array.from({ length: 200 }, () => makeId()));
+  assert.equal(ids.size, 200);
+  for (const id of ids) assert.ok(typeof id === "string" && id.length > 0);
+});
+
+test("lib source references no crypto at all", () => {
+  const src = readFileSync(new URL("./lib.js", import.meta.url), "utf8");
+  assert.ok(!src.includes("crypto"), "lib.js must not use crypto");
+});
+
 function fakeState() {
   return newState(() => 0.5);
 }
-
 function fakeStorage() {
   const map = new Map();
   return {

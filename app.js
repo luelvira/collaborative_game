@@ -115,25 +115,25 @@ function cardTemplate(group, color) {
       rm.className = "rm";
       rm.textContent = "✕";
       rm.title = "Remove member";
-      rm.addEventListener("click", () => act(() => removeMember(state, group.id, name)));
+      rm.addEventListener("click", on(() => act(() => removeMember(state, group.id, name)), "Remove member"));
       li.append(label, rm);
       membersNode.append(li);
     });
     card.querySelector(".empty-hint").hidden = group.members.length > 0;
   };
 
-  card.querySelector(".rm-group").addEventListener("click", () =>
-    act(() => removeGroup(state, group.id)),
-  );
+  card.querySelector(".rm-group").addEventListener("click", on(() =>
+    act(() => removeGroup(state, group.id)), "Remove group",
+  ));
   card.querySelectorAll(".points-row [data-delta]").forEach((btn) =>
-    btn.addEventListener("click", () =>
-      act(() => addPoints(state, group.id, Number(btn.dataset.delta))),
-    ),
+    btn.addEventListener("click", on(() =>
+      act(() => addPoints(state, group.id, Number(btn.dataset.delta))), "Points",
+    )),
   );
   const customInput = card.querySelector(".custom-points input");
   const customBtn = card.querySelector(".custom-points button");
   const applyCustom = () => act(() => addPoints(state, group.id, Number(customInput.value)));
-  customBtn.addEventListener("click", applyCustom);
+  customBtn.addEventListener("click", on(applyCustom, "Custom points"));
   customInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") applyCustom();
   });
@@ -245,8 +245,21 @@ function act(action) {
   renderBoard();
 }
 
+// Last-line-of-defense: wrap every event handler so an unexpected exception
+// becomes a visible toast instead of a silently dead control, no matter how
+// hostile the environment (LAN http, older browsers, odd extensions).
+function on(handler, label) {
+  return (event) => {
+    try {
+      return handler(event);
+    } catch (e) {
+      return toast((label ? label + ": " : "") + (e && e.message ? e.message : e));
+    }
+  };
+}
+
 function wireTopBar() {
-  els.addGroup.addEventListener("click", () => act(() => addGroup(state)));
+  els.addGroup.addEventListener("click", on(() => act(() => addGroup(state)), "Add group"));
 
   const addNamedUser = () => {
     const name = els.userName.value.trim();
@@ -256,15 +269,15 @@ function wireTopBar() {
     act(() => addMember(state, anchor.id, name));
     els.userName.value = "";
   };
-  els.addUser.addEventListener("click", addNamedUser);
+  els.addUser.addEventListener("click", on(addNamedUser, "Add user"));
   els.userName.addEventListener("keydown", (e) => {
     if (e.key === "Enter") addNamedUser();
   });
 }
 
 function wireOverlay() {
-  els.endContest.addEventListener("click", endContest);
-  els.reset.addEventListener("click", resetContest);
+  els.endContest.addEventListener("click", on(endContest, "End contest"));
+  els.reset.addEventListener("click", on(resetContest, "Reset"));
 }
 
 boot();

@@ -167,6 +167,25 @@ test("boot renders one card per stored group with score and chip", async () => {
   }
 });
 
+test("a handler that throws shows the error as a visible toast, not a dead button", async () => {
+  const { document, window, cleanup } = bootWithSeededState(seedThreeGroupsSevenUsers);
+  try {
+    const original = globalThis.ContestLib.addMember;
+    // sabotage BEFORE import: app.js destructures ContestLib at module eval
+    globalThis.ContestLib.addMember = () => { throw new TypeError("boom"); };
+    await appModule();
+    const user = document.querySelector("#user-name");
+    user.value = "zed";
+    document.querySelector("#add-user").dispatchEvent(new window.Event("click", { bubbles: true }));
+    globalThis.ContestLib.addMember = original;
+    const toast = document.querySelector("#toast.show");
+    assert.notEqual(toast, null);
+    assert.match(document.querySelector("#toast").textContent, /boom/);
+  } finally {
+    cleanup();
+  }
+});
+
 const appModule = () => import(`./app.js?t=${Date.now()}-${Math.random()}`);
 
 test("clicking +1 updates the score and persists", async () => {

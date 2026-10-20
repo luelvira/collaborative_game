@@ -45,6 +45,18 @@ globalThis.ContestLib = (function () {
     return candidates[Math.floor(rng() * candidates.length)];
   }
 
+  // Ids need uniqueness, not secrecy: avoid the browser's
+  // secure-context UUID API so ids also work over plain LAN http or older
+  // browsers where that API is missing.
+  function makeId(rng = Math.random) {
+    return (
+      "g" +
+      Date.now().toString(36) +
+      Math.floor(rng() * 1e9).toString(36) +
+      Math.floor(rng() * 1e9).toString(36)
+    );
+  }
+
   function newState(rng = Math.random) {
     return {
       startedAt: Date.now(),
@@ -58,7 +70,7 @@ globalThis.ContestLib = (function () {
     if (state.groups.length >= MAX_GROUPS) {
       return { error: `Maximum ${MAX_GROUPS} groups` };
     }
-    state.groups.push({ id: crypto.randomUUID(), name, members: [], points: 0 });
+    state.groups.push({ id: makeId(), name, members: [], points: 0 });
     return { ok: true };
   }
 
@@ -144,6 +156,7 @@ globalThis.ContestLib = (function () {
     groupName,
     colorFor,
     pickGroup,
+    makeId,
     newState,
     addGroup,
     removeGroup,
