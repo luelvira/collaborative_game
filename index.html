@@ -29,7 +29,7 @@
       <div class="controls">
         <div class="control">
           <label for="group-count">Groups</label>
-          <input id="group-count" type="number" min="2" max="6" step="1" value="2">
+          <input id="group-count" type="number" min="2" max="10" step="1" value="2">
         </div>
         <div class="control">
           <label for="user-name">Add player</label>
@@ -55,10 +55,7 @@
         <button type="button" id="end-contest" class="danger">End contest</button>
       </div>
     </header>
-    <main id="board" class="board" aria-live="polite">
-      <div class="board-row" data-row="0"></div>
-      <div class="board-row" data-row="1"></div>
-    </main>
+    <main id="board" class="board" aria-live="polite"></main>
   </section>
 
   <div id="winner" class="overlay" hidden>

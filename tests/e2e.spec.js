@@ -19,10 +19,15 @@ test("setup: choose N, name groups, add players, start contest", async ({ page }
   await page.goto("/");
   await page.locator("#fresh-session").click();
 
-  await page.locator("#group-count").fill("3");
-  await page.locator("#group-count").dispatchEvent("change");
+  // nothing renders until N is picked (fresh setup has no groups)
+  await expect(page.locator("#setup-groups input.setup-group-name")).toHaveCount(0);
+  const groupCount = page.locator("#group-count");
+  await groupCount.fill("3");
+  await groupCount.dispatchEvent("change");
   const nameInputs = page.locator("#setup-groups input.setup-group-name");
   await expect(nameInputs).toHaveCount(3);
+  await expect(groupCount).toHaveAttribute("min", "2")
+  await expect(groupCount).toHaveAttribute("max", "10")
 
   // rename the first group
   const first = nameInputs.first();
@@ -41,6 +46,53 @@ test("setup: choose N, name groups, add players, start contest", async ({ page }
   await expect(page.locator("#view-play")).toBeVisible();
   const cards = page.locator("#board .card");
   await expect(cards).toHaveCount(3);
+});
+
+test("setup: uses the same balanced row layout as the board", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("#fresh-session").click();
+
+  const groupCount = page.locator("#group-count");
+  await groupCount.fill("10");
+  await groupCount.dispatchEvent("change");
+
+  const nameInputs = page.locator("#setup-groups input.setup-group-name");
+  await expect(nameInputs).toHaveCount(10);
+  // same balanced ≤3-per-row split: 10 → 3 on the first row
+  await expect(page.locator('.board-row[data-row="0"] input.setup-group-name')).toHaveCount(3);
+  await expect(page.locator('.board-row[data-row="1"] input.setup-group-name')).toHaveCount(3);
+  await expect(page.locator('.board-row[data-row="2"] input.setup-group-name')).toHaveCount(2);
+  await expect(page.locator('.board-row[data-row="3"] input.setup-group-name')).toHaveCount(2);
+});
+
+test("board rows: 10 groups split 3 + 3 + 2 + 2 across centered rows", async ({ page }) => {
+  await page.goto("/");
+  await page.addInitScript(() => {
+    const state = {
+      startedAt: Date.now(),
+      phase: "playing",
+      startHue: 180,
+      groups: Array.from({ length: 10 }, (_, i) => ({
+        id: `g${i}`,
+        name: `G${i}`,
+        members: ["p"],
+        points: 0,
+      })),
+    };
+    localStorage.setItem("contestBoard:current", JSON.stringify(state));
+  });
+  await page.goto("/");
+  await page.locator("#continue-session").click();
+  await page.locator("#view-play").waitFor({ state: "visible" });
+
+  const row0 = page.locator('.board-row[data-row="0"] .card');
+  const row1 = page.locator('.board-row[data-row="1"] .card');
+  const row2 = page.locator('.board-row[data-row="2"] .card');
+  const row3 = page.locator('.board-row[data-row="3"] .card');
+  await expect(row0).toHaveCount(3);
+  await expect(row1).toHaveCount(3);
+  await expect(row2).toHaveCount(2);
+  await expect(row3).toHaveCount(2);
 });
 
 test("board rows: 5 groups split 3 + 2 across two centered rows", async ({ page }) => {
@@ -137,4 +189,28 @@ test("board uses two .board-row containers and centered rows", async ({ page }) 
   await expect(page.locator(".board-row")).toHaveCount(2);
   await expect(page.locator('.board-row[data-row="0"] .card')).toHaveCount(2);
   await expect(page.locator('.board-row[data-row="1"] .card')).toHaveCount(2);
+});
+
+test("board uses one .board-row containers and centered rows", async ({ page }) => {
+  await page.goto("/");
+  await page.addInitScript(() => {
+    const state = {
+      startedAt: Date.now(),
+      phase: "playing",
+      startHue: 180,
+      groups: Array.from({ length: 2 }, (_, i) => ({
+        id: `g${i}`,
+        name: `G${i}`,
+        members: ["p"],
+        points: 0,
+      })),
+    };
+    localStorage.setItem("contestBoard:current", JSON.stringify(state));
+  });
+  await page.goto("/");
+  await page.locator("#continue-session").click();
+  await page.locator("#view-play").waitFor({ state: "visible" });
+
+  await expect(page.locator(".board-row")).toHaveCount(1);
+  await expect(page.locator('.board-row[data-row="0"] .card')).toHaveCount(2);
 });

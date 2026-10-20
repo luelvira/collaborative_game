@@ -95,74 +95,24 @@ function renderSetup() {
 
   setupGroups.innerHTML = "";
 
+  // No groups chosen yet — nothing renders until N is picked.
   if (n === 0 || state.startHue == null) {
-    // No groups chosen yet
+    updateStartContestButton();
     return;
   }
 
-  state.groups.forEach((group) => {
-    const groupEl = document.createElement("section");
-    groupEl.className = "setup-group";
-    groupEl.dataset.groupId = group.id;
-
-    const header = document.createElement("header");
-    header.className = "setup-group-header";
-    const swatch = document.createElement("span");
-    swatch.className = "setup-swatch";
-    swatch.style.background = api.colorFor(state.startHue, state.groups, group.id);
-    const nameInput = document.createElement("input");
-    nameInput.className = "setup-group-name";
-    nameInput.type = "text";
-    nameInput.value = group.name || api.groupName(state.startHue, state.groups, group.id);
-    nameInput.maxLength = 30;
-    nameInput.addEventListener("change", () => {
-      const res = api.renameGroup(state, group.id, nameInput.value);
-      if (res && res.error) {
-        toast(res.error);
-        nameInput.value = group.name || api.groupName(state.startHue, state.groups, group.id);
-        return;
-      }
-      persist();
-      renderSetup();
-      renderBoard();
-    });
-    header.append(swatch, nameInput);
-    groupEl.append(header);
-
-    const membersWrap = document.createElement("div");
-    membersWrap.className = "setup-members";
-    const list = document.createElement("ul");
-    list.className = "setup-members-list";
-    if (group.members.length === 0) {
-      const empty = document.createElement("li");
-      empty.className = "empty-hint";
-      empty.textContent = "No members yet";
-      list.append(empty);
-    } else {
-      group.members.forEach((m) => {
-        const li = document.createElement("li");
-        const span = document.createElement("span");
-        span.textContent = m;
-        const rm = document.createElement("button");
-        rm.type = "button";
-        rm.className = "rm";
-        rm.textContent = "✕";
-        rm.addEventListener("click", () => {
-          const res = api.removeMember(state, group.id, m);
-          if (res && res.error) {
-            toast(res.error);
-            return;
-          }
-          persist();
-          renderSetup();
-        });
-        li.append(span, rm);
-        list.append(li);
-      });
+  // Same balanced row layout as the board (≤ 3 editors per row), so the
+  // setup screen mirrors what the projector will show during play.
+  const sizes = api.rowSizes(state.groups.length);
+  let idx = 0;
+  sizes.forEach((size, r) => {
+    const row = document.createElement("div");
+    row.className = "board-row";
+    row.dataset.row = String(r);
+    for (let s = 0; s < size; s++, idx++) {
+      row.append(setupGroupEditor(state.groups[idx]));
     }
-    membersWrap.append(list);
-    groupEl.append(membersWrap);
-    setupGroups.append(groupEl);
+    setupGroups.append(row);
   });
 
   updateStartContestButton();
@@ -177,6 +127,73 @@ function updateStartContestButton() {
   } else {
     btn.disabled = true;
   }
+}
+
+// One editable group card for the setup screen: color swatch, rename input
+// and the setup-only member list with remove buttons.
+function setupGroupEditor(group) {
+  const groupEl = document.createElement("section");
+  groupEl.className = "setup-group";
+  groupEl.dataset.groupId = group.id;
+
+  const header = document.createElement("header");
+  header.className = "setup-group-header";
+  const swatch = document.createElement("span");
+  swatch.className = "setup-swatch";
+  swatch.style.background = api.colorFor(state.startHue, state.groups, group.id);
+  const nameInput = document.createElement("input");
+  nameInput.className = "setup-group-name";
+  nameInput.type = "text";
+  nameInput.value = group.name || api.groupName(state.startHue, state.groups, group.id);
+  nameInput.maxLength = 30;
+  nameInput.addEventListener("change", () => {
+    const res = api.renameGroup(state, group.id, nameInput.value);
+    if (res && res.error) {
+      toast(res.error);
+      nameInput.value = group.name || api.groupName(state.startHue, state.groups, group.id);
+      return;
+    }
+    persist();
+    renderSetup();
+    renderBoard();
+  });
+  header.append(swatch, nameInput);
+  groupEl.append(header);
+
+  const membersWrap = document.createElement("div");
+  membersWrap.className = "setup-members";
+  const list = document.createElement("ul");
+  list.className = "setup-members-list";
+  if (group.members.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "empty-hint";
+    empty.textContent = "No members yet";
+    list.append(empty);
+  } else {
+    group.members.forEach((m) => {
+      const li = document.createElement("li");
+      const span = document.createElement("span");
+      span.textContent = m;
+      const rm = document.createElement("button");
+      rm.type = "button";
+      rm.className = "rm";
+      rm.textContent = "✕";
+      rm.addEventListener("click", () => {
+        const res = api.removeMember(state, group.id, m);
+        if (res && res.error) {
+          toast(res.error);
+          return;
+        }
+        persist();
+        renderSetup();
+      });
+      li.append(span, rm);
+      list.append(li);
+    });
+  }
+  membersWrap.append(list);
+  groupEl.append(membersWrap);
+  return groupEl;
 }
 
 function memberRowPlay(name) {
@@ -243,17 +260,35 @@ function setCardDisabled(card, disabled) {
   card.querySelectorAll("input").forEach((i) => (i.disabled = disabled));
 }
 
+// Create/remove .board-row containers so their count matches rowSizes(n);
+// common case (score updates) touches nothing here.
+function ensureRows(container, sizes) {
+  let rows = [...container.querySelectorAll(".board-row")];
+  while (rows.length < sizes.length) {
+    const row = document.createElement("div");
+    row.className = "board-row";
+    container.appendChild(row);
+    rows.push(row);
+  }
+  while (rows.length > sizes.length) {
+    rows.pop().remove();
+  }
+  rows.forEach((row, i) => {
+    if (row.dataset.row !== String(i)) row.dataset.row = String(i);
+  });
+  return rows;
+}
+
 // Keep existing card nodes; only create/remove/move when the group set or
 // layout actually changes, so a score update never re-triggers the enter
 // animation (no flash on every board refresh).
 function renderBoard() {
   const board = $("#board");
   if (!board) return;
-  const rows = board.querySelectorAll(".board-row");
-  if (rows.length < 2) return;
 
   const groups = state.groups || [];
-  const firstCount = api.boardRows(groups.length)[0] || 0;
+  const sizes = api.rowSizes(groups.length);
+  const rows = ensureRows(board, sizes);
 
   // Sweep away cards whose group no longer exists.
   const keep = new Set(groups.map((g) => g.id));
@@ -261,21 +296,21 @@ function renderBoard() {
     if (!keep.has(card.dataset.groupId)) card.remove();
   }
 
-  groups.forEach((group, idx) => {
-    const inFirstRow = idx < firstCount;
-    const row = inFirstRow ? rows[0] : rows[1];
-    const slot = inFirstRow ? idx : idx - firstCount;
-    let card = board.querySelector(`.card[data-group-id="${group.id}"]`);
-    if (!card) {
-      card = cardTemplatePlay(group);
+  let idx = 0;
+  rows.forEach((row, r) => {
+    for (let slot = 0; slot < sizes[r]; slot++, idx++) {
+      let card = board.querySelector(`.card[data-group-id="${groups[idx].id}"]`);
+      if (!card) {
+        card = cardTemplatePlay(groups[idx]);
+      }
+      // Re-parent or re-order in place only when the position actually differs;
+      // insertBefore with the right neighbour keeps DOM churn at zero for the
+      // common case (score updates), so nothing re-animates.
+      if (card.parentElement !== row || row.children[slot] !== card) {
+        row.insertBefore(card, row.children[slot] || null);
+      }
+      patchCardPlay(card, groups[idx]);
     }
-    // Re-parent or re-order in place only when the position actually differs;
-    // insertBefore with the right neighbour keeps DOM churn at zero for the
-    // common case (score updates), so nothing re-animates.
-    if (card.parentElement !== row || row.children[slot] !== card) {
-      row.insertBefore(card, row.children[slot] || null);
-    }
-    patchCardPlay(card, group);
   });
 
   updatePlayChrome();

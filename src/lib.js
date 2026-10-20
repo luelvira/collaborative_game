@@ -1,6 +1,6 @@
 "use strict";
 
-const MAX_GROUPS = 6;
+const MAX_GROUPS = 10;
 const MIN_GROUPS = 2;
 const MAX_HISTORY = 20;
 const HISTORY_KEY = "contestBoard:history";
@@ -225,10 +225,13 @@ export function hasSavedSession(storage) {
   }
 }
 
-/** Row sizes for a two-row centered board: ceil(N/2) then floor(N/2). */
-export function boardRows(n) {
-  if (n <= 0) return [0, 0];
-  return [Math.ceil(n / 2), Math.floor(n / 2)];
+/** Balanced rows with at most 3 cards each: 10 → [3,3,2,2], 4 → [2,2]. */
+export function rowSizes(n) {
+  if (n <= 0) return [];
+  const rows = Math.ceil(n / 3);
+  const base = Math.floor(n / rows);
+  const extras = n % rows;
+  return Array.from({ length: rows }, (_, i) => (i < extras ? base + 1 : base));
 }
 
 export { MAX_GROUPS, MIN_GROUPS, MAX_HISTORY, HISTORY_KEY };

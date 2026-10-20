@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { it, expect } from 'vitest'
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -26,7 +26,7 @@ import {
   loadHistory,
   saveHistory,
   MAX_HISTORY,
-  boardRows,
+  rowSizes,
 } from "./lib.js";
 
 it("makeId produces string ids from Math.random alone (no crypto, no secure context)", () => {
@@ -188,13 +188,18 @@ it("archiveRun works", () => {
   expect(run.groups.length).toBe(2);
 });
 
-it("boardRows gives correct splits", () => {
-  expect(boardRows(6)).toEqual([3, 3]);
-  expect(boardRows(5)).toEqual([3, 2]);
-  expect(boardRows(4)).toEqual([2, 2]);
-  expect(boardRows(3)).toEqual([2, 1]);
-  expect(boardRows(2)).toEqual([1, 1]);
-  expect(boardRows(10)).toEqual([5, 5]);
+it("rowSizes splits N into balanced rows of at most 3 cards", () => {
+  expect(rowSizes(1)).toEqual([1]);
+  expect(rowSizes(2)).toEqual([2]);
+  expect(rowSizes(3)).toEqual([3]);
+  expect(rowSizes(4)).toEqual([2, 2]);
+  expect(rowSizes(5)).toEqual([3, 2]);
+  expect(rowSizes(6)).toEqual([3, 3]);
+  expect(rowSizes(7)).toEqual([3, 2, 2]);
+  expect(rowSizes(8)).toEqual([3, 3, 2]);
+  expect(rowSizes(9)).toEqual([3, 3, 3]);
+  expect(rowSizes(10)).toEqual([3, 3, 2, 2]);
+  expect(rowSizes(0)).toEqual([]);
 });
 
 it("history save/load round-trips runs", () => {
