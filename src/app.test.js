@@ -199,6 +199,10 @@ it("reset archives the play with start timestamp and restarts", async () => {
     expect(fresh.startedAt > runs[0].startedAt).toBe(true);
     expect(document.querySelector("#winner").hidden).toBe(true);
     expect(document.querySelector("#history").hidden).toBe(false);
+    // Spanish copy: history heading + "Ganador: {names}" (tie between the 3-pointers)
+    const historyText = document.querySelector("#history").textContent;
+    expect(historyText).toContain("Partidas anteriores");
+    expect(historyText).toMatch(/Ganador: (Alpha & Charlie|Charlie & Alpha)/);
   } finally {
     cleanup();
   }
@@ -251,6 +255,8 @@ it("a handler that throws shows the error as a visible toast, not a dead button"
     document.querySelector("#add-user").dispatchEvent(new window.Event("click", { bubbles: true }));
     const toast = document.querySelector("#toast.show");
     expect(toast).not.toBe(null);
+    // Spanish crash prefix: "{label}: {message}" with the Spanish label
+    expect(toast.textContent).toBe("Añadir jugador: boom");
   } finally {
     cleanup();
   }

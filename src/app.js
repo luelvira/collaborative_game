@@ -320,13 +320,13 @@ function renderHistory() {
         .filter(Boolean)
         .join(" & ");
       const who = document.createElement("span");
-      who.textContent = names ? `Winner: ${names}` : "Winner: -";
+      who.textContent = names ? `Ganador: ${names}` : "Ganador: -";
       li.append(when, who);
       list.append(li);
     });
   historyEl.replaceChildren(document.createElement("h2"), list);
   const h2 = historyEl.querySelector("h2");
-  if (h2) h2.textContent = "Past plays";
+  if (h2) h2.textContent = "Partidas anteriores";
 }
 
 function renderSetup() {
@@ -413,7 +413,7 @@ function setupGroupEditor(group) {
   if (group.members.length === 0) {
     const empty = document.createElement("li");
     empty.className = "empty-hint";
-    empty.textContent = "No members yet";
+    empty.textContent = "Aún sin jugadores";
     list.append(empty);
   } else {
     group.members.forEach((m) => {
@@ -465,7 +465,7 @@ function cardTemplatePlay(group) {
         <button type="button" class="plus" data-action="award">+1</button>
       </div>
       <ul class="members"></ul>
-      <span class="empty-hint" hidden>No members yet</span>
+      <span class="empty-hint" hidden>Aún sin jugadores</span>
     </div>`;
   patchCardPlay(card, group, { isNew: true });
   return card;
@@ -581,11 +581,13 @@ function updatePlayChrome() {
     const n = state.groups.length;
     const members = state.groups.reduce((sum, g) => sum + g.members.length, 0);
     if (state.phase === "frozen") {
-      status.textContent = "Contest ended";
+      status.textContent = "Concurso terminado";
     } else if (state.phase === "playing") {
-      status.textContent = `${n} group${n === 1 ? "" : "s"} · ${members} player${members === 1 ? "" : "s"}`;
+      // Spanish plural: 1 grupo / 1 jugador take no ending (same shape as the
+      // old `${n === 1 ? "" : "s"}` trick, just written out per dictionary).
+      status.textContent = `${n} ${n === 1 ? "grupo" : "grupos"} · ${members} ${members === 1 ? "jugador" : "jugadores"}`;
     } else {
-      status.textContent = "Live";
+      status.textContent = "En directo";
     }
   }
   const endBtn = $("#end-contest");
@@ -608,7 +610,7 @@ function renderWinner() {
   const names = winnerIds
     .map((id) => api.groupName(state.startHue, state.groups, id))
     .filter(Boolean);
-  if (winnerName) winnerName.textContent = names.join(" & ") || "Tie";
+  if (winnerName) winnerName.textContent = names.join(" & ") || "Empate";
   if (winnerMembers) {
     winnerMembers.innerHTML = "";
     state.groups
@@ -626,7 +628,9 @@ function renderWinner() {
       .filter((g) => !winnerIds.includes(g.id))
       .map((g) => `${api.groupName(state.startHue, state.groups, g.id)} (${g.points})`)
       .join(", ");
-    runnerUp.textContent = rest ? `Runner-up: ${rest}` : "";
+    // Dictionary string kept even on ties: with a tie the list of the rest
+    // still reads as the runners-up ("Segundo puesto: {names}"), just shared.
+    runnerUp.textContent = rest ? `Segundo puesto: ${rest}` : "";
   }
   winnerEl.hidden = false;
 }
@@ -638,7 +642,7 @@ function wireHome() {
     cont.addEventListener("click", () => {
       const raw = localStorage.getItem(CURRENT_KEY);
       if (!raw) {
-        toast("Nothing saved to continue");
+        toast("Nada guardado para continuar");
         updateHome();
         return;
       }
@@ -646,7 +650,7 @@ function wireHome() {
         state = api.deserialize(raw);
         if (!state || !Array.isArray(state.groups)) throw new Error("bad");
       } catch (e) {
-        toast("Could not load saved session");
+        toast("No se pudo cargar la sesión guardada");
         return;
       }
       persist();
@@ -707,7 +711,7 @@ function wireSetup() {
         }
         persist();
         renderSetup();
-      }, "Groups"),
+      }, "Grupos"),
     );
   }
   const addUser = $("#add-user");
@@ -715,8 +719,8 @@ function wireSetup() {
   const addNamedUser = () => {
     if (!userName) return;
     const name = userName.value.trim();
-    if (!name) return toast("Type a name for the user");
-    if (!state.groups || state.groups.length === 0) return toast("Create groups first");
+    if (!name) return toast("Escribe un nombre para el jugador");
+    if (!state.groups || state.groups.length === 0) return toast("Crea primero los grupos");
     const anchor = state.groups[0];
     const res = api.addMember(state, anchor.id, name);
     if (res && res.error) {
@@ -727,7 +731,7 @@ function wireSetup() {
     persist();
     renderSetup();
   };
-  if (addUser) addUser.addEventListener("click", on(addNamedUser, "Add user"));
+  if (addUser) addUser.addEventListener("click", on(addNamedUser, "Añadir jugador"));
   if (userName) {
     userName.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
@@ -750,7 +754,7 @@ function wireSetup() {
         showView("#view-play");
         renderBoard();
         renderWinner();
-      }, "Start contest"),
+      }, "Empezar concurso"),
     );
   }
   const setupHome = $("#setup-home");
@@ -761,7 +765,7 @@ function wireSetup() {
         showView("#view-home");
         updateHome();
         renderHistory();
-      }, "Home"),
+      }, "Inicio"),
     );
   }
 }
@@ -812,7 +816,7 @@ function wireOverlay() {
   const reset = $("#reset");
   if (reset) {
     reset.addEventListener("click", () => {
-      if (!window.confirm("Archive this play and start a new contest?")) return;
+      if (!window.confirm("¿Archivar esta partida y empezar un concurso nuevo?")) return;
       const runs = api.loadHistory(localStorage);
       runs.push(api.archiveRun(state));
       api.saveHistory(localStorage, runs);

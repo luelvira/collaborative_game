@@ -59,6 +59,8 @@ test.describe("contest board end-to-end", () => {
 
   test("awards points with the single award button in play; refresh keeps score", async ({ page }) => {
     await setupContest(page, 2, ["ana"]);
+    // Spanish copy: status line with correct Spanish plurals
+    await expect(page.locator("#status-line")).toHaveText("2 grupos · 1 jugador");
     const firstCard = page.locator("#board .card").first();
     // the −1 button is gone; one award button (+1) is the whole points-row
     await expect(page.locator('[data-delta="-1"]')).toHaveCount(0);
@@ -119,7 +121,7 @@ test.describe("contest board end-to-end", () => {
     await expect(page.locator("#view-home")).toBeVisible();
     await expect(page.locator("#history")).toBeVisible();
     await expect(page.locator("#history li")).toHaveCount(1);
-    await expect(page.locator("#history li")).toContainText("Winner");
+    await expect(page.locator("#history li")).toContainText("Ganador:");
   });
 
   test("roster is locked during play: no add-user in the play view", async ({ page }) => {

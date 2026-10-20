@@ -6,6 +6,16 @@ test("home shows Continue (disabled with no save) and Fresh opens setup", async 
   await expect(page.locator("#view-setup")).toBeHidden();
   await expect(page.locator("#view-play")).toBeHidden();
 
+  // Spanish copy dictionary (Task 5)
+  await expect(page).toHaveTitle("Tablero de Concurso");
+  await expect(page.locator(".home-kicker")).toHaveText("Concurso en directo para el aula");
+  await expect(page.locator(".home-title")).toHaveText("Tablero de Concurso");
+  await expect(page.locator(".home-sub")).toHaveText(
+    "Marcador preparado para proyectar. Todo se guarda en este navegador.",
+  );
+  await expect(page.locator("#continue-session")).toHaveText("Continuar la última sesión");
+  await expect(page.locator("#fresh-session")).toHaveText("Nueva partida");
+
   await expect(page.locator("#continue-session")).toBeDisabled();
   await expect(page.locator("#fresh-session")).toBeEnabled();
   await expect(page.locator("#history")).toBeHidden();
@@ -13,6 +23,9 @@ test("home shows Continue (disabled with no save) and Fresh opens setup", async 
   await page.locator("#fresh-session").click();
   await expect(page.locator("#view-setup")).toBeVisible();
   await expect(page.locator("#view-home")).toBeHidden();
+  await expect(page.locator("#view-setup .status")).toHaveText(
+    "Elige grupos, ponles nombre y añade jugadores",
+  );
 });
 
 test("setup: choose N, name groups, add players, start contest", async ({ page }) => {
@@ -150,6 +163,10 @@ test("play board is score-only, end archives and returns home", async ({ page })
   await page.locator("#end-contest").click();
   await expect(page.locator("#winner")).toBeVisible();
   await expect(page.locator("#winner-name")).toHaveText(/Alpha/);
+  // Spanish copy: podium title and runner-up line (task 5 dictionary)
+  await expect(page.locator(".podium-title")).toHaveText("Ganador");
+  await expect(page.locator("#runner-up")).toHaveText("Segundo puesto: Bravo (0)");
+  await expect(page.locator("#status-line")).toHaveText("Concurso terminado");
 
   // reset archives and returns home (accept the confirm dialog)
   page.once("dialog", (d) => d.accept());
@@ -159,6 +176,8 @@ test("play board is score-only, end archives and returns home", async ({ page })
 
   // history now shows the archived play
   await expect(page.locator("#history")).toBeVisible();
+  await expect(page.locator("#history")).toContainText("Partidas anteriores");
+  await expect(page.locator("#history")).toContainText("Ganador: Alpha");
   await expect(page.locator("#history")).toContainText("Alpha");
 
   // current key now holds the fresh setup state, so Continue is enabled again
