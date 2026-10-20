@@ -1,4 +1,6 @@
-import {
+"use strict";
+
+const {
   newState,
   addGroup,
   removeGroup,
@@ -6,13 +8,14 @@ import {
   removeMember,
   addPoints,
   colorFor,
+  groupName,
   serialize,
   deserialize,
   loadHistory,
   saveHistory,
   archiveRun,
   winners,
-} from "./lib.js";
+} = globalThis.ContestLib;
 
 const CURRENT_KEY = "contestBoard:current";
 const $ = (sel) => document.querySelector(sel);
@@ -41,7 +44,6 @@ function toast(message) {
 function boot() {
   [
     ["board", "#board"],
-    ["groupName", "#group-name"],
     ["addGroup", "#add-group"],
     ["userName", "#user-name"],
     ["addUser", "#add-user"],
@@ -97,7 +99,7 @@ function cardTemplate(group, color) {
       <ul class="members"></ul>
       <span class="empty-hint" hidden>No members yet</span>
     </div>`;
-  card.querySelector(".card-head h3").textContent = group.name;
+  card.querySelector(".card-head h3").textContent = groupName(state.startHue, state.groups, group.id);
   const scoreNode = card.querySelector(".score");
 
   const render = () => {
@@ -156,7 +158,6 @@ function renderBoard() {
   els.endContest.disabled = state.groups.length === 0 || frozen;
   els.addGroup.disabled = frozen;
   els.addUser.disabled = frozen;
-  els.groupName.disabled = frozen;
   els.userName.disabled = frozen;
 }
 
@@ -189,7 +190,7 @@ function renderHistory() {
 function renderWinner() {
   const winnerIds = winners(state);
   const names = winnerIds
-    .map((id) => state.groups.find((g) => g.id === id)?.name)
+    .map((id) => groupName(state.startHue, state.groups, id))
     .filter(Boolean);
   els.winnerName.textContent = names.join(" & ");
   const membersList = els.winnerMembers;
@@ -245,16 +246,7 @@ function act(action) {
 }
 
 function wireTopBar() {
-  const addNamedGroup = () => {
-    const name = els.groupName.value.trim();
-    if (!name) return toast("Group needs a name");
-    act(() => addGroup(state, name));
-    els.groupName.value = "";
-  };
-  els.addGroup.addEventListener("click", addNamedGroup);
-  els.groupName.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") addNamedGroup();
-  });
+  els.addGroup.addEventListener("click", () => act(() => addGroup(state)));
 
   const addNamedUser = () => {
     const name = els.userName.value.trim();

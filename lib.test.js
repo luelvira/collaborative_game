@@ -1,8 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
+import "./lib.js";
+
+const {
   colorHue,
   colorFor,
+  colorName,
+  groupName,
   pickGroup,
   newState,
   addGroup,
@@ -16,7 +20,7 @@ import {
   deserialize,
   loadHistory,
   saveHistory,
-} from "./lib.js";
+} = globalThis.ContestLib;
 
 function fakeState() {
   return newState(() => 0.5);
@@ -46,6 +50,31 @@ test("colorFor returns hsl with constant saturation and lightness", () => {
   addGroup(state, "Reds");
   const id = state.groups[0].id;
   assert.equal(colorFor(state.startHue, state.groups, id), "hsl(180, 70%, 55%)");
+});
+
+test("colorName buckets every 30 degrees over the whole wheel", () => {
+  assert.equal(colorName(10), "red");
+  assert.equal(colorName(350), "red"); // wrap
+  assert.equal(colorName(40), "orange");
+  assert.equal(colorName(80), "lime");
+  assert.equal(colorName(180), "cyan");
+  assert.equal(colorName(300), "magenta");
+});
+
+test("addGroup names the group after its color when no name is given", () => {
+  const state = fakeState(); // startHue 180
+  addGroup(state);
+  // one group: hue 180 -> cyan
+  assert.equal(groupName(state.startHue, state.groups, state.groups[0].id), "cyan");
+  assert.equal(state.groups[0].name, undefined); // name stays derived, never baked
+  addGroup(state);
+  // two groups: 180 and 360(0) -> cyan and red
+  const [first, second] = state.groups;
+  assert.equal(groupName(state.startHue, state.groups, second.id), "red");
+  addGroup(state);
+  // three groups: re-split hues 180, 300, 60 -> cyan, magenta, yellow
+  const third = state.groups[2];
+  assert.equal(groupName(state.startHue, state.groups, third.id), "yellow");
 });
 
 test("pickGroup picks from minimum-size groups only", () => {
@@ -162,14 +191,16 @@ test("serialize/deserialize round-trips startedAt, phase and groups", () => {
 
 test("archiveRun captures start, end, groups and winners", () => {
   const state = fakeState();
-  addGroup(state, "A");
-  addGroup(state, "B");
+  addGroup(state);          // cyan (hue 180)
+  addGroup(state);          // red (hue 0)
   addPoints(state, state.groups[0].id, 4);
   addPoints(state, state.groups[1].id, 4);
   const run = archiveRun(state, 12345);
   assert.equal(run.startedAt, state.startedAt);
   assert.equal(run.endedAt, 12345);
   assert.equal(run.groups.length, 2);
+  // names baked into the snapshot so history stays readable after reset
+  assert.deepEqual(run.groups.map((g) => g.name).sort(), ["cyan", "red"]);
   assert.deepEqual(run.winners.sort(), state.groups.map((g) => g.id).sort());
 });
 

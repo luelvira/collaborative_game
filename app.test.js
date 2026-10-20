@@ -2,7 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { parseHTML } from "linkedom";
 import { readFileSync } from "node:fs";
-import { newState, addGroup, addMember, addPoints, serialize } from "./lib.js";
+import "./lib.js";
+
+const {
+  newState,
+  addGroup,
+  addMember,
+  addPoints,
+  serialize,
+} = globalThis.ContestLib;
 
 function bootWithSeededState(seedBuilder) {
   const html = readFileSync(new URL("./index.html", import.meta.url), "utf8").replace(
@@ -48,6 +56,37 @@ function frozenSeed() {
   s.phase = "frozen";
   return s;
 }
+
+test("adding groups without typing names gives them their color names", async () => {
+  const { document, window, store, cleanup } = bootWithSeededState(() => {
+    const s = newState(() => 0.5); // startHue 180
+    return s;
+  });
+  try {
+    await appModule();
+    document.querySelector("#add-group").dispatchEvent(new window.Event("click", { bubbles: true }));
+    assert.equal(document.querySelectorAll("#board .card").length, 1);
+    assert.equal(document.querySelector("#board .card .card-head h3").textContent, "cyan");
+    document.querySelector("#add-group").dispatchEvent(new window.Event("click", { bubbles: true }));
+    const names = [...document.querySelectorAll("#board .card .card-head h3")].map((n) => n.textContent);
+    assert.deepEqual(names, ["cyan", "red"]);
+    // the group name input is gone; nothing to type
+    assert.equal(document.querySelector("#group-name"), null);
+  } finally {
+    cleanup();
+  }
+});
+
+test("adding a named group (via seeded state) still renders its name", async () => {
+  const { document, cleanup } = bootWithSeededState(seedThreeGroupsSevenUsers);
+  try {
+    await appModule();
+    const names = [...document.querySelectorAll("#board .card .card-head h3")].map((n) => n.textContent);
+    assert.deepEqual(names, ["Alpha", "Bravo", "Charlie"]);
+  } finally {
+    cleanup();
+  }
+});
 
 test("end contest freezes the board and shows tied winners", async () => {
   const { document, window, store, cleanup } = bootWithSeededState(seedThreeGroupsSevenUsers);

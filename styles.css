@@ -145,7 +145,11 @@ button.danger {
   align-items: baseline;
 }
 
-.card-head h3 { margin: 0; font-size: 1.15rem; }
+.card-head h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  text-transform: capitalize;
+}
 
 .score {
   font-size: 1.9rem;
