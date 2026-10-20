@@ -27,6 +27,13 @@ import {
   saveHistory,
   MAX_HISTORY,
   rowSizes,
+  initialRound,
+  setQuestion,
+  startRound,
+  expireRound,
+  awardPoints,
+  undoLastAward,
+  nextQuestion,
 } from "./lib.js";
 
 it("makeId produces string ids from Math.random alone (no crypto, no secure context)", () => {
@@ -69,11 +76,11 @@ it("colorFor returns hsl with constant saturation and lightness", () => {
 });
 
 it("colorName buckets every 30 degrees over the whole wheel", () => {
-  expect(colorName(10)).toBe("red");
-  expect(colorName(350)).toBe("red");
-  expect(colorName(40)).toBe("orange");
-  expect(colorName(80)).toBe("lime");
-  expect(colorName(180)).toBe("cyan");
+  expect(colorName(10)).toBe("rojo");
+  expect(colorName(350)).toBe("rosa");
+  expect(colorName(40)).toBe("naranja");
+  expect(colorName(80)).toBe("amarillo");
+  expect(colorName(180)).toBe("cian");
   expect(colorName(300)).toBe("magenta");
 });
 
@@ -82,8 +89,8 @@ it("newState seeds in setup with two color-named groups and a startHue", () => {
   expect(state.phase).toBe("setup");
   expect(state.groups.length).toBe(2);
   expect(state.startHue).toBe(180);
-  expect(state.groups[0].name).toBe("cyan");
-  expect(state.groups[1].name).toBe("red");
+  expect(state.groups[0].name).toBe("cian");
+  expect(state.groups[1].name).toBe("rojo");
   expect(state.groups[0].id).not.toBe(state.groups[1].id);
   expect(state.startedAt > 0).toBe(true);
 });
@@ -94,9 +101,9 @@ it("setGroupCount recreates N color-named groups, keeping an existing startHue",
   expect(res).toEqual({ ok: true });
   expect(state.startHue).toBe(180);
   expect(state.groups.length).toBe(3);
-  expect(state.groups[0].name).toBe("cyan");
+  expect(state.groups[0].name).toBe("cian");
   expect(state.groups[1].name).toBe("magenta");
-  expect(state.groups[2].name).toBe("yellow");
+  expect(state.groups[2].name).toBe("amarillo");
 });
 
 it("renameGroup renames only in setup", () => {
@@ -189,6 +196,220 @@ it("archiveRun works", () => {
   const run = archiveRun(state, 12345);
   expect(run.endedAt).toBe(12345);
   expect(run.groups.length).toBe(2);
+});
+
+// Helper: a state in the playing phase with one member in group 0.
+function playingState() {
+  const state = newState();
+  setGroupCount(state, 2, () => 0.5);
+  addMember(state, state.groups[0].id, "alice");
+  startContest(state);
+  return state;
+}
+
+it("colorName returns the Spanish names with 30-wide buckets starting at rojo=0", () => {
+  expect(colorName(0)).toBe("rojo");
+  expect(colorName(30)).toBe("naranja");
+  expect(colorName(60)).toBe("amarillo");
+  expect(colorName(90)).toBe("lima");
+  expect(colorName(120)).toBe("verde");
+  expect(colorName(150)).toBe("turquesa");
+  expect(colorName(180)).toBe("cian");
+  expect(colorName(210)).toBe("celeste");
+  expect(colorName(240)).toBe("azul");
+  expect(colorName(270)).toBe("violeta");
+  expect(colorName(300)).toBe("magenta");
+  expect(colorName(330)).toBe("rosa");
+});
+
+it("initialRound defaults to 30 seconds in draft", () => {
+  expect(initialRound()).toEqual({
+    question: "",
+    seconds: 30,
+    phase: "draft",
+    undoLog: [],
+  });
+  expect(initialRound(15).seconds).toBe(15);
+});
+
+it("newState seeds a draft round of 30 seconds", () => {
+  const state = newState();
+  expect(state.round.phase).toBe("draft");
+  expect(state.round.seconds).toBe(30);
+  expect(state.round.question).toBe("");
+  expect(state.round.undoLog).toEqual([]);
+});
+
+it("setQuestion trims the text, requires playing phase, allows empty in draft", () => {
+  const state = playingState();
+  const res = setQuestion(state, "  ¿Capital de Francia?  ");
+  expect(res).toEqual({ ok: true });
+  expect(state.round.question).toBe("¿Capital de Francia?");
+  expect(state.round.phase).toBe("draft");
+  expect(setQuestion(state, "")).toEqual({ ok: true });
+  expect(state.round.question).toBe("");
+  const frozen = playingState();
+  endContest(frozen);
+  expect(setQuestion(frozen, "hola").error).toBe("Concurso no en juego");
+});
+
+it("startRound requires playing, a non-empty question, and goes live", () => {
+  const state = newState();
+  setGroupCount(state, 2, () => 0.5);
+  addMember(state, state.groups[0].id, "alice");
+  expect(startRound(state).error).toBe("Concurso no en juego");
+  startContest(state);
+  setQuestion(state, "   ");
+  expect(startRound(state).error).toBe("Pregunta vacía");
+  setQuestion(state, "¿Cuánto es 2+2?");
+  expect(startRound(state)).toEqual({ ok: true });
+  expect(state.round.phase).toBe("live");
+  expect(startRound(state).error).toBeDefined();
+});
+
+it("expireRound moves live to expired exactly once", () => {
+  const state = playingState();
+  expect(expireRound(state).error).toBeDefined();
+  setQuestion(state, "¿5×5?");
+  startRound(state);
+  expect(expireRound(state)).toEqual({ ok: true });
+  expect(state.round.phase).toBe("expired");
+  expect(expireRound(state).error).toBeDefined();
+});
+
+it("awardPoints validates like addPoints and works from draft, live and expired", () => {
+  const state = playingState();
+  const id = state.groups[0].id;
+  // Timer never started: awarding from draft is allowed.
+  expect(state.round.phase).toBe("draft");
+  expect(awardPoints(state, id)).toEqual({ ok: true });
+  expect(state.groups[0].points).toBe(1);
+  expect(state.round.phase).toBe("answered");
+
+  startRound(state);
+  expect(awardPoints(state, id)).toEqual({ ok: true });
+  expect(state.groups[0].points).toBe(2);
+
+  expireRound(state);
+  expect(awardPoints(state, id)).toEqual({ ok: true });
+  expect(state.groups[0].points).toBe(3);
+
+  const frozen = playingState();
+  const other = frozen.groups[1].id;
+  endContest(frozen);
+  expect(awardPoints(frozen, other).error).toBe("Concurso no en juego");
+  const playing = playingState();
+  expect(awardPoints(playing, "nope").error).toBe("Grupo desconocido");
+  expect(awardPoints(playing, playing.groups[0].id, 1.5).error).toBe(
+    "Cantidad no válida",
+  );
+  expect(awardPoints(playing, playing.groups[0].id, Infinity).error).toBe(
+    "Cantidad no válida",
+  );
+});
+
+it("awardPoints appends entries in order across double awards", () => {
+  const state = playingState();
+  const a = state.groups[0].id;
+  const b = state.groups[1].id;
+  awardPoints(state, a);
+  awardPoints(state, b, 2);
+  expect(state.round.undoLog.length).toBe(2);
+  expect(state.round.undoLog).toEqual([
+    { groupId: a, amount: 1 },
+    { groupId: b, amount: 2 },
+  ]);
+});
+
+it("awardPoints caps undoLog at 20 entries, dropping the oldest", () => {
+  const state = playingState();
+  const id = state.groups[0].id;
+  const amounts = Array.from({ length: 25 }, (_, i) => i + 1);
+  for (const amount of amounts) awardPoints(state, id, amount);
+  expect(state.round.undoLog.length).toBe(20);
+  expect(state.round.undoLog[0]).toEqual({ groupId: id, amount: 6 });
+  expect(state.round.undoLog[19]).toEqual({ groupId: id, amount: 25 });
+});
+
+it("undoLastAward pops the newest entry first and reverts points", () => {
+  const state = playingState();
+  const a = state.groups[0].id;
+  const b = state.groups[1].id;
+  awardPoints(state, a, 3);
+  awardPoints(state, b, 2);
+  const res1 = undoLastAward(state);
+  expect(res1.ok).toBe(true);
+  expect(res1.undone).toEqual({ groupId: b, amount: 2 });
+  expect(state.groups[1].points).toBe(0);
+  const res2 = undoLastAward(state);
+  expect(res2.undone).toEqual({ groupId: a, amount: 3 });
+  expect(state.groups[0].points).toBe(0);
+  expect(undoLastAward(state)).toEqual({ error: "Nada que deshacer" });
+  // Undoing must not flip the round phase by itself.
+  expect(state.round.phase).toBe("answered");
+});
+
+it("undoLastAward reverts an award from a previous question (log survives nextQuestion)", () => {
+  const state = playingState();
+  const id = state.groups[0].id;
+  awardPoints(state, id, 1);
+  nextQuestion(state);
+  const res = undoLastAward(state);
+  expect(res.ok).toBe(true);
+  expect(res.undone.groupId).toBe(id);
+  expect(state.groups[0].points).toBe(0);
+});
+
+it("nextQuestion clears the question and returns to draft, keeping seconds and undoLog", () => {
+  const state = playingState();
+  const id = state.groups[0].id;
+  setQuestion(state, "¿5×5?");
+  state.round.seconds = 45;
+  startRound(state);
+  expireRound(state);
+  awardPoints(state, id, 1);
+  expect(nextQuestion(state)).toEqual({ ok: true });
+  expect(state.round.question).toBe("");
+  expect(state.round.phase).toBe("draft");
+  expect(state.round.seconds).toBe(45);
+  expect(state.round.undoLog.length).toBe(1);
+  expect(nextQuestion(state).error).toBeUndefined();
+  const frozen = playingState();
+  endContest(frozen);
+  expect(nextQuestion(frozen).error).toBe("Concurso no en juego");
+});
+
+it("endContest discards the round and freezes", () => {
+  const state = playingState();
+  setQuestion(state, "¿Cuánto es 2+2?");
+  startRound(state);
+  awardPoints(state, state.groups[0].id);
+  expect(endContest(state)).toEqual({ ok: true });
+  expect(state.phase).toBe("frozen");
+  expect(state.round).toEqual({
+    question: "",
+    seconds: 30,
+    phase: "draft",
+    undoLog: [],
+  });
+  expect(endContest(state).error).toBeDefined();
+});
+
+it("deserialize hydrates a missing empty round without touching groups or points", () => {
+  const state = playingState();
+  delete state.round;
+  const oldState = { question: "¿Qué acabamos de hacer?", seconds: 30 };
+  Object.assign(oldState, JSON.parse(serialize(state)));
+  delete oldState.round;
+  const restored = deserialize(JSON.stringify(oldState));
+  expect(restored.round.phase).toBe("draft");
+  expect(restored.round.seconds).toBe(30);
+  expect(restored.groups).toEqual(state.groups);
+  expect(restored.phase).toBe(state.phase);
+  // A round present but missing phase is also hydrated.
+  const broken = { ...state, round: { question: "x", seconds: 30 } };
+  const restored2 = deserialize(JSON.stringify(broken));
+  expect(restored2.round.phase).toBe("draft");
 });
 
 it("rowSizes splits N into balanced rows of at most 3 cards", () => {

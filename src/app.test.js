@@ -276,7 +276,7 @@ it("clicking +1 updates the score and persists", async () => {
 
 it("runner-up uses color names when groups have no explicit name", async () => {
   const { document, window, cleanup } = bootWithSeededState(() => {
-    // newState(() => 0.5) seeds two groups on hue 180: "cyan" and "red".
+    // newState(() => 0.5) seeds two groups on hue 180: "cian" and "rojo".
     const s = newState(() => 0.5);
     addMember(s, s.groups[0].id, "alice", () => 0);
     addMember(s, s.groups[1].id, "bob", () => 0.5);
@@ -289,7 +289,7 @@ it("runner-up uses color names when groups have no explicit name", async () => {
     await appModule();
     document.querySelector("#continue-session").dispatchEvent(new window.Event("click", { bubbles: true }));
     document.querySelector("#end-contest").dispatchEvent(new window.Event("click", { bubbles: true }));
-    expect(document.querySelector("#runner-up").textContent).toMatch(/red/);
+    expect(document.querySelector("#runner-up").textContent).toMatch(/rojo/);
   } finally {
     cleanup();
   }
