@@ -214,24 +214,17 @@ test("board uses one .board-row containers and centered rows", async ({ page }) 
   await expect(page.locator('.board-row[data-row="0"] .card')).toHaveCount(2);
 });
 
-test("decorative stripes live in a non-scrolling layer (scroll fluidity)", async ({ page }) => {
+test("board paints a flat dark scoreboard: no stripes, no glow", async ({ page }) => {
   await page.goto("/");
-  // Root cause: the -18deg repeating stripe gradient, painted as part of the
-  // scroll-tied body background, is re-rasterized on every scroll and makes
-  // the page (and its animations) feel slow on low-end machines. The pattern
-  // must be rasterized once inside a fixed-position layer instead.
   const styles = await page.evaluate(() => {
     const body = getComputedStyle(document.body);
     const before = getComputedStyle(document.body, "::before");
-    return {
-      bodyImage: body.backgroundImage,
-      beforePosition: before.position,
-      beforeImage: before.backgroundImage,
-    };
+    const h1 = getComputedStyle(document.querySelector("#view-home .home-title"));
+    return { bodyBg: body.backgroundColor, beforeImage: before.backgroundImage, h1Shadow: h1.textShadow };
   });
-  expect(styles.bodyImage).not.toContain("repeating-linear-gradient");
-  expect(styles.beforePosition).toBe("fixed");
-  expect(styles.beforeImage).toContain("repeating-linear-gradient");
+  expect(styles.bodyBg).toBe("rgb(10, 10, 15)");
+  expect(styles.beforeImage).toBe("none");
+  expect(styles.h1Shadow).toBe("none");
 });
 
 test("winner overlay is light enough to see scroll behind and scrolls itself if tall", async ({ page }) => {

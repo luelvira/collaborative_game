@@ -1,22 +1,18 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #050510;
-  --color-ink-mid: #080814;
-  --color-surface: #101018;
-  --color-surface-2: #151522;
-  --color-line: #2a2a40;
-  --color-text: #f0f0ff;
-  --color-text-dim: #9a9ab8;
-  --color-amber: #22d3ee;
-  --color-amber-ink: #001018;
-  --color-mint: #22d3ee;
-  --color-cyan: #22d3ee;
-  --color-magenta: #ff3fbf;
-  --color-lime: #a3ff12;
-  --color-hot-amber: #ff6b1c;
-  --color-danger: #ff3b5c;
-  --color-danger-ink: #1a0008;
+  --color-ink: #0a0a0f;
+  --color-surface: #121218;
+  --color-surface-2: #15151d;
+  --color-line: #2c2c3a;
+  --color-text: #ffffff;
+  --color-text-dim: #cfd2dc;
+  --color-accent: #22d3ee;
+  --color-danger: #ff5c7c;
+  /* Ink-on-color pairs: dark ink guarantees AA contrast on the solid
+     danger/primary button fills (spec: flat color, no gradients/glows). */
+  --color-danger-ink: #2a020c;
+  --color-primary-ink: #0a0a0f;
   --font-display: "Syne", system-ui, sans-serif;
   --font-body: "DM Sans", system-ui, sans-serif;
   --radius-board: 16px;
@@ -31,33 +27,15 @@
     display: none !important;
   }
 
+  /* Plain unambiguous black. The scoreboard is projected on a washed-out
+     classroom TV, so the background carries zero raster work: no gradients,
+     no fixed stripe layer, nothing to re-rasterize on scroll. */
   body {
     margin: 0;
     min-height: 100vh;
     color: var(--color-text);
     font-family: var(--font-body);
     background-color: var(--color-ink);
-    background-image:
-      radial-gradient(ellipse at 50% 0%, rgb(34 211 238 / 0.08), transparent 55%),
-      linear-gradient(165deg, var(--color-ink-mid), var(--color-ink) 65%, #030308);
-  }
-
-  /* The -18deg stripe pattern is painted in a fixed, non-scrolling layer so
-     it rasterizes once instead of repainting on every scroll step (which made
-     both scrolling and animations run slow on low-end machines). */
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    background-image: repeating-linear-gradient(
-      -18deg,
-      transparent,
-      transparent 22px,
-      rgb(163 255 18 / 0.02) 22px,
-      rgb(163 255 18 / 0.02) 23px
-    );
   }
 
   button,
@@ -72,7 +50,7 @@
   }
 
   input:focus {
-    border-color: var(--color-amber);
+    border-color: var(--color-accent);
   }
 
   button {
@@ -101,11 +79,10 @@
   }
 
   button.primary {
-    background: linear-gradient(90deg, var(--color-cyan), var(--color-magenta));
+    background: var(--color-text);
     border-color: transparent;
-    color: #000814;
+    color: var(--color-primary-ink);
     font-weight: 800;
-    text-shadow: 0 0 20px rgb(34 211 238 / 0.4);
   }
 
   button.ghost {
@@ -136,8 +113,9 @@
     margin: 0;
     text-transform: uppercase;
     letter-spacing: 0.3em;
-    color: var(--color-cyan);
-    font-size: 0.75rem;
+    color: var(--color-accent);
+    font-size: 0.9rem;
+    font-weight: 700;
   }
 
   .home-title {
@@ -146,12 +124,12 @@
     font-size: clamp(3rem, 8vw, 5rem);
     font-weight: 800;
     letter-spacing: -0.04em;
-    text-shadow: 0 0 60px rgb(34 211 238 / 0.4);
   }
 
   .home-sub {
     margin: 0;
     color: var(--color-text-dim);
+    font-size: 1.1rem;
   }
 
   .home-actions {
@@ -164,6 +142,8 @@
 
   .home-btn {
     min-width: 220px;
+    font-size: 1.1rem;
+    padding: 0.75rem 1.4rem;
   }
 
   .view-setup {
@@ -180,11 +160,10 @@
   }
 
   .setup-group {
-    background: linear-gradient(180deg, rgb(16 16 24 / 0.9), rgb(10 10 20 / 0.95));
-    border: 1px solid rgb(34 211 238 / 0.3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
     border-radius: 14px;
     overflow: hidden;
-    box-shadow: 0 20px 60px rgb(34 211 238 / 0.12);
   }
 
   .setup-group-header {
@@ -192,21 +171,22 @@
     align-items: center;
     gap: 0.75rem;
     padding: 0.9rem 1rem;
-    border-bottom: 1px solid rgb(42 42 64 / 0.8);
+    border-bottom: 1px solid var(--color-line);
   }
 
   .setup-swatch {
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    box-shadow: 0 0 20px currentColor;
+    flex: none;
   }
 
   .setup-group-name {
     flex: 1;
     min-width: 0;
     background: transparent;
-    border: 1px solid rgb(42 42 64 / 0.8);
+    border: 1px solid var(--color-line);
+    font-size: 1.1rem;
   }
 
   .setup-members {
@@ -219,17 +199,18 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: 0.45rem;
+    font-size: 1.1rem;
   }
 
   .setup-members-list li {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgb(21 21 34 / 0.8);
+    background: var(--color-surface-2);
     border-radius: 8px;
-    padding: 0.4rem 0.6rem;
-    border: 1px solid rgb(42 42 64 / 0.8);
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--color-line);
   }
 
   .setup-members-list .rm {
@@ -246,10 +227,8 @@
     align-items: end;
     justify-content: space-between;
     padding: 1.75rem 1.75rem 1.4rem;
-    border-bottom: 1px solid rgb(34 211 238 / 0.4);
-    background: linear-gradient(90deg, rgb(16 16 24 / 0.9), rgb(10 10 20 / 0.95));
-    backdrop-filter: blur(10px);
-    box-shadow: 0 10px 60px rgb(34 211 238 / 0.15);
+    border-bottom: 1px solid var(--color-line);
+    background: var(--color-surface);
   }
 
   .brand {
@@ -262,7 +241,7 @@
   .brand h1 {
     margin: 0;
     font-family: var(--font-display);
-    font-size: clamp(2rem, 4vw, 2.85rem);
+    font-size: clamp(2.4rem, 5vw, 3.4rem);
     font-weight: 800;
     letter-spacing: -0.03em;
     line-height: 0.95;
@@ -271,7 +250,7 @@
   .brand .status {
     margin: 0;
     color: var(--color-text-dim);
-    font-size: 0.95rem;
+    font-size: 1.05rem;
   }
 
   .controls {
@@ -288,7 +267,7 @@
   }
 
   .control label {
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: var(--color-text-dim);
@@ -326,37 +305,32 @@
     max-width: 420px;
   }
 
+  /* Single-column card: no per-card color chip or glow. Team identity comes
+     from the thick top border, set inline per card (Task 3) via
+     `border-top: 10px solid <teamColor>`; this 1px line is the fallback so
+     the card still reads before that inline style lands. */
   .card {
     display: grid;
-    grid-template-columns: 10px 1fr;
-    background: linear-gradient(180deg, rgb(20 20 36 / 0.9), rgb(12 12 24 / 0.95));
-    border: 1px solid rgb(34 211 238 / 0.35);
+    grid-template-columns: 1fr;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
     border-radius: var(--radius-board);
     overflow: hidden;
-    box-shadow:
-      0 0 0 1px rgb(255 63 191 / 0.15) inset,
-      0 20px 60px rgb(34 211 238 / 0.18),
-      0 0 80px rgb(255 63 191 / 0.08);
-    min-height: 320px;
-    max-height: 420px;
+    min-height: 380px;
+    max-height: 520px;
   }
 
   .card.card-enter {
     animation: card-in 0.34s cubic-bezier(0.2, 0.7, 0.3, 1);
   }
 
-  /* Gentle fade+rise when a view is unhidden (home → setup → play). */
+  /* Gentle fade+rise when a view is unhidden (home -> setup -> play). */
   .view {
     animation: view-in 0.24s cubic-bezier(0.2, 0.7, 0.3, 1);
   }
 
-  .chip {
-    width: 10px;
-    min-height: 100%;
-  }
-
   .card-body {
-    padding: 1rem 1.1rem 1.15rem;
+    padding: 1.1rem 1.25rem 1.25rem;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
@@ -373,7 +347,7 @@
   .card-head h3 {
     margin: 0;
     font-family: var(--font-display);
-    font-size: 1.4rem;
+    font-size: 2rem;
     font-weight: 800;
     text-transform: capitalize;
     letter-spacing: -0.02em;
@@ -390,14 +364,15 @@
     padding: 0.15rem 0.35rem;
   }
 
+  /* The score is the dominant element of the TV card; tabular-nums keeps
+     digit changes from wobbling neighbors. */
   .score {
     font-family: var(--font-display);
-    font-size: clamp(2.8rem, 4vw, 3.6rem);
+    font-size: clamp(3.4rem, 5vw, 4.6rem);
     font-weight: 800;
     line-height: 1;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.03em;
-    text-shadow: 0 0 40px rgb(34 211 238 / 0.35);
   }
 
   .points-row {
@@ -409,19 +384,18 @@
   .points-row button {
     flex: 1;
     min-width: 3.2rem;
-    min-height: 2.75rem;
+    min-height: 2.85rem;
     padding: 0.55rem 0.35rem;
+    font-size: 1.1rem;
     font-weight: 700;
   }
 
   .points-row .plus {
-    color: var(--color-lime);
-    text-shadow: 0 0 15px rgb(163 255 18 / 0.4);
+    color: var(--color-text);
   }
 
   .points-row .minus {
-    color: #ff6b6b;
-    text-shadow: 0 0 15px rgb(255 107 107 / 0.4);
+    color: var(--color-danger);
   }
 
   .custom-points {
@@ -432,17 +406,20 @@
   .custom-points input {
     flex: 1;
     min-width: 0;
+    font-size: 1.1rem;
   }
 
+  /* Member rows are taller and larger so names read from the back of the
+     room; the list itself scrolls inside the fixed card height. */
   .members {
     list-style: none;
     margin: 0;
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
-    font-size: 0.95rem;
-    max-height: 140px;
+    gap: 0.4rem;
+    font-size: 1.1rem;
+    max-height: 170px;
     overflow-y: auto;
   }
 
@@ -453,7 +430,7 @@
     background: transparent;
   }
   .members::-webkit-scrollbar-thumb {
-    background: rgb(34 211 238 / 0.4);
+    background: var(--color-line);
     border-radius: 4px;
   }
 
@@ -461,10 +438,10 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgb(21 21 34 / 0.8);
+    background: var(--color-surface-2);
     border-radius: 8px;
-    padding: 0.4rem 0.65rem;
-    border: 1px solid rgb(42 42 64 / 0.8);
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--color-line);
     overflow: hidden;
   }
 
@@ -488,23 +465,20 @@
 
   .empty-hint {
     color: var(--color-text-dim);
-    font-size: 0.9rem;
+    font-size: 1rem;
   }
 
   .overlay {
     position: fixed;
     inset: 0;
-    background:
-      radial-gradient(ellipse at 50% 20%, rgb(34 211 238 / 0.25), transparent 55%),
-      radial-gradient(ellipse at 50% 80%, rgb(255 63 191 / 0.18), transparent 60%),
-      rgb(5 5 16 / 0.82);
-    backdrop-filter: blur(8px);
+    /* Flat translucent ink. The overlay stays semi-translucent (alpha 0.82)
+       so the board reacting to scroll stays perceptible behind it, and it
+       scrolls its own tall content instead of swallowing document scroll —
+       both covered by e2e tests, keep those properties. */
+    background: rgb(10 10 15 / 0.82);
     display: grid;
     place-items: center;
     padding: 1.5rem;
-    /* Semi-translucent backdrop keeps the board visibly responsive to scroll;
-       the overlay itself scrolls when the podium is taller than the viewport,
-       instead of swallowing the document scroll. */
     overflow-y: auto;
     animation: overlay-in 0.45s cubic-bezier(0.2, 0.7, 0.3, 1);
   }
@@ -513,11 +487,10 @@
     width: min(100%, 34rem);
     text-align: center;
     padding: 2.5rem 1.75rem;
-    border-top: 3px solid var(--color-cyan);
-    box-shadow: 0 0 60px rgb(34 211 238 / 0.25);
-    background: linear-gradient(180deg, rgb(16 16 24 / 0.95), rgb(10 10 20 / 0.98));
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-top: 3px solid var(--color-accent);
     border-radius: 16px;
-    border: 1px solid rgb(34 211 238 / 0.4);
     animation: podium-in 0.45s cubic-bezier(0.2, 0.7, 0.3, 1);
   }
 
@@ -525,10 +498,9 @@
     margin: 0;
     text-transform: uppercase;
     letter-spacing: 0.28em;
-    color: var(--color-cyan);
-    font-size: 0.78rem;
+    color: var(--color-accent);
+    font-size: 0.9rem;
     font-weight: 700;
-    text-shadow: 0 0 20px rgb(34 211 238 / 0.5);
   }
 
   #winner-name {
@@ -538,7 +510,6 @@
     font-weight: 800;
     letter-spacing: -0.03em;
     line-height: 1;
-    text-shadow: 0 0 40px rgb(34 211 238 / 0.4);
   }
 
   #winner-members {
@@ -550,11 +521,13 @@
     flex-wrap: wrap;
     gap: 0.4rem 1rem;
     justify-content: center;
+    font-size: 1.1rem;
   }
 
   .runner-up {
     color: var(--color-text-dim);
     margin: 0 0 1.5rem;
+    font-size: 1.1rem;
   }
 
   .history {
@@ -564,7 +537,7 @@
   }
 
   .history h2 {
-    font-size: 0.8rem;
+    font-size: 0.9rem;
     text-transform: uppercase;
     letter-spacing: 0.12em;
     color: var(--color-text-dim);
@@ -585,11 +558,11 @@
     justify-content: space-between;
     gap: 1rem;
     flex-wrap: wrap;
-    background: linear-gradient(90deg, rgb(16 16 24 / 0.9), rgb(12 12 24 / 0.9));
-    border: 1px solid rgb(34 211 238 / 0.3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
     border-radius: 10px;
     padding: 0.7rem 1rem;
-    font-size: 0.95rem;
+    font-size: 1rem;
   }
 
   .history .when {
@@ -602,8 +575,8 @@
     left: 50%;
     bottom: 1.75rem;
     transform: translateX(-50%) translateY(1.25rem);
-    background: linear-gradient(90deg, var(--color-danger), #ff6b1c);
-    color: #fff;
+    background: var(--color-danger);
+    color: var(--color-danger-ink);
     font-weight: 700;
     padding: 0.65rem 1.15rem;
     border-radius: 999px;
@@ -611,7 +584,6 @@
     transition: opacity 0.2s ease, transform 0.2s ease;
     pointer-events: none;
     z-index: 50;
-    box-shadow: 0 0 40px rgb(255 59 92 / 0.4);
   }
 
   #toast.show {
