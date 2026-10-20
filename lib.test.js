@@ -79,10 +79,13 @@ test("removeGroup refuses a group with members, allows an empty one", () => {
   const state = fakeState();
   addGroup(state, "A");
   addGroup(state, "B");
-  const [a, b] = state.groups;
-  addMember(state, a.id, "alice");
-  assert.equal(removeGroup(state, a.id).error !== undefined, true);
-  assert.deepEqual(removeGroup(state, b.id), { ok: true });
+  addMember(state, state.groups[0].id, "alice");
+  // find which lowest-population group actually received the member
+  const carrier = state.groups.find((g) => g.members.length > 0);
+  assert.ok(carrier);
+  assert.equal(removeGroup(state, carrier.id).error !== undefined, true);
+  const other = state.groups.find((g) => g.members.length === 0);
+  assert.deepEqual(removeGroup(state, other.id), { ok: true });
   assert.equal(state.groups.length, 1);
 });
 
