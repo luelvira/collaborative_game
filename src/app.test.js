@@ -12,6 +12,11 @@ import {
   startContest,
   endContest,
   serialize,
+  setQuestion,
+  startRound,
+  expireRound,
+  awardPoints,
+  undoLastAward,
 } from "./lib.js";
 
 function bootWithSeededState(seedBuilder) {
@@ -299,6 +304,81 @@ it("runner-up uses color names when groups have no explicit name", async () => {
     document.querySelector("#continue-session").dispatchEvent(new window.Event("click", { bubbles: true }));
     document.querySelector("#end-contest").dispatchEvent(new window.Event("click", { bubbles: true }));
     expect(document.querySelector("#runner-up").textContent).toMatch(/rojo/);
+  } finally {
+    cleanup();
+  }
+});
+
+// Final-review Finding 1: the expired-round source message must survive the
+// refresh that killed the old module variable. Expired → awarded → undo-all →
+// (refresh → continue) leaves phase "answered" with no awards, yet the spec
+// demands the red "⏱ ¡Tiempo!" strip — message AND expired accent.
+it("an expired round awarded and fully undone returns to the red ⏱ ¡Tiempo! strip after a refresh", async () => {
+  const { document, window, cleanup } = bootWithSeededState(() => {
+    const s = newState(() => 0.5);
+    addMember(s, s.groups[0].id, "alice", () => 0);
+    startContest(s);
+    setQuestion(s, "¿5×5?");
+    startRound(s);
+    expireRound(s);
+    awardPoints(s, s.groups[0].id, 1);
+    undoLastAward(s);
+    return s;
+  });
+  try {
+    await appModule();
+    // continue-session is what a refresh lands on (hydrated from storage).
+    document.querySelector("#continue-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    expect(document.querySelector("#q-after").hidden).toBe(false);
+    expect(document.querySelector("#q-result").textContent).toBe("⏱ ¡Tiempo!");
+    expect(document.querySelector("#q-strip").dataset.e).toBe("expired");
+  } finally {
+    cleanup();
+  }
+});
+
+// Final-review Finding 3: plan promised a reduced-motion guard test for the
+// award celebration. celebrate() is read through the same DOM helper the rest
+// of this file uses; the classList wrappers record every add/remove so the
+// synchronous add→remove (nothing animates) is actually observable.
+it("celebrate() under prefers-reduced-motion removes flash/celebrating synchronously with zero confetti", async () => {
+  const { document, window, cleanup } = bootWithSeededState(seedThreeGroupsSevenUsers);
+  try {
+    const { celebrate } = await appModule();
+    document.querySelector("#continue-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    window.matchMedia = (query) => ({
+      matches: query === "(prefers-reduced-motion: reduce)",
+    });
+    const card = document.querySelector("#board .card");
+    const board = document.querySelector("#board");
+    const log = [];
+    const record = (el) => {
+      const real = el.classList;
+      Object.defineProperty(el, "classList", {
+        configurable: true,
+        value: {
+          add: (...names) => {
+            log.push(names);
+            real.add(...names);
+          },
+          remove: (...names) => {
+            log.push(names);
+            real.remove(...names);
+          },
+          contains: (name) => real.contains(name),
+          toggle: name => real.toggle(name),
+        },
+      });
+    };
+    record(card);
+    record(board);
+    celebrate(card);
+    // Añadido y retirada síncronos: flash y celebrating entran y salen en el
+    // mismo tick, sin confeti ni timeout de limpieza.
+    expect(log).toEqual([["flash"], ["celebrating"], ["flash"], ["celebrating"]]);
+    expect(card.classList.contains("flash")).toBe(false);
+    expect(board.classList.contains("celebrating")).toBe(false);
+    expect(card.querySelectorAll(".confetti").length).toBe(0);
   } finally {
     cleanup();
   }

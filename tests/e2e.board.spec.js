@@ -240,8 +240,35 @@ test.describe("franja de pregunta en la vista de juego", () => {
     await expect(page.locator("#view-play")).toBeVisible();
     await expect(page.locator("#q-live")).toBeVisible();
     await expect(page.locator("#q-text")).toHaveText("¿En qué año estamos?");
-    // the countdown restarts at its initial value after the refresh
-    await expect(page.locator("#q-timer")).toHaveText("30");
+    // Solución de la revisión final (Finding 4): el primer tick pinta 29 en
+    // máquinas lentas; aceptar 30 o 29 y no romper por ruido de reloj.
+    await expect(page.locator("#q-timer")).toHaveText(/^(30|29)$/);
+  });
+
+  test("expiracion: franja roja, deshacer inerte y puntuar a mano celebra", async ({ page }) => {
+    await setupContest(page, 2, ["ana"]);
+    await launchQuestion(page, "¿Capital de Mongolia?", 5);
+    // The 200 ms tick reaches zero inside the 5 s budget; give it 6.5 s.
+    await page.waitForTimeout(6500);
+    await expect(page.locator("#q-live")).toBeHidden();
+    await expect(page.locator("#q-after")).toBeVisible();
+    await expect(page.locator("#q-result")).toHaveText("⏱ ¡Tiempo!");
+    // expired accent: the strip carries the phase in data-e (answered uses
+    // the same marker, in green) — set by renderStrip from round.phase.
+    await expect(page.locator("#q-strip")).toHaveAttribute("data-e", "expired");
+    // Nothing was awarded this round: the undo chip sits disabled.
+    await expect(page.locator("#undo-award")).toBeDisabled();
+
+    // Manual award from expired celebrates like from live, and the strip
+    // switches to the answered (green) accent while the round stays answered.
+    const cards = page.locator("#board .card");
+    const names = await cards.locator(".card-head h3").allTextContents();
+    await cards.nth(0).locator('[data-action="award"]').click();
+    await expect(page.locator("#q-result")).toHaveText(`¡Punto para ${names[0]}!`);
+    await expect(cards.nth(0).locator(".score")).toHaveText("1");
+    await expect(page.locator("#q-strip")).toHaveAttribute("data-e", "answered");
+    await expect(page.locator("#q-live")).toBeHidden();
+    await expect(page.locator("#q-after")).toBeVisible();
   });
 
   test("sesion antigua sin ronda sigue cargando", async ({ page }) => {

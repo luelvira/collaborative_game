@@ -24,9 +24,9 @@ function notifyAward() {
 // in full (spec decision), and expiry must not re-fire after a reload.
 let roundStartAt = 0;
 let tickTimer = null;
-// True once the current round hit the countdown, so an answered round keeps
-// "⏱ ¡Tiempo!" as its source message after every award has been undone.
-let expiredThisRound = false;
+// The expired-round memory itself IS persisted: round.expired (lib.js) so it
+// survives a refresh — the strip keeps "⏱ ¡Tiempo!" as its source message
+// after every award has been undone.
 
 let state;
 
@@ -66,7 +66,6 @@ function onRoundTick() {
     stopRoundTick();
     const res = api.expireRound(state);
     if (res && res.error) return;
-    expiredThisRound = true;
     persist();
     renderStrip();
     notifyExpiry();
@@ -92,7 +91,7 @@ function afterMessage() {
     const name = api.groupName(state.startHue, state.groups, last.groupId);
     return { text: `¡Punto para ${name}!`, kind: "award" };
   }
-  if (round.phase === "expired" || expiredThisRound) {
+  if (round.phase === "expired" || round.expired === true) {
     return { text: "⏱ ¡Tiempo!", kind: "expired" };
   }
   return { text: "", kind: "none" };
@@ -138,6 +137,11 @@ function renderStrip() {
   }
   stopRoundTick();
   const msg = afterMessage();
+  // The accent follows the message source: an expired round whose awards were
+  // all undone keeps the red "⏱ ¡Tiempo!" accent even though its phase is
+  // answered — the persisted round.expired flag is the real source of truth.
+  if (msg.kind === "award") strip.dataset.e = "answered";
+  if (msg.kind === "expired") strip.dataset.e = "expired";
   const result = $("#q-result");
   if (result) {
     result.textContent = msg.text;
@@ -151,8 +155,9 @@ function renderStrip() {
 // The awarded card fills flat with its team color, the rest of the board dims
 // for the same 900 ms, and 8 colored squares drop inside the card. Color-on /
 // color-off only (no gradients, no shadows); under prefers-reduced-motion the
-// classes are removed synchronously so nothing animates.
-function celebrate(card) {
+// classes are removed synchronously so nothing animates. Exported for the
+// guard unit tests (final-review Finding 3).
+export function celebrate(card) {
   const board = $("#board");
   if (!card || !board) return;
   const reduced =
@@ -226,7 +231,6 @@ function wireStrip() {
         if (q && q.error) return toast(q.error);
         const r = api.startRound(state);
         if (r && r.error) return toast(r.error);
-        expiredThisRound = false;
         persist();
         input.value = "";
         renderStrip();

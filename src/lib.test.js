@@ -228,6 +228,7 @@ it("initialRound defaults to 30 seconds in draft", () => {
     seconds: 30,
     phase: "draft",
     undoLog: [],
+    expired: false,
   });
   expect(initialRound(15).seconds).toBe(15);
 });
@@ -237,6 +238,7 @@ it("newState seeds a draft round of 30 seconds", () => {
   expect(state.round.phase).toBe("draft");
   expect(state.round.seconds).toBe(30);
   expect(state.round.question).toBe("");
+  expect(state.round.expired).toBe(false);
   expect(state.round.undoLog).toEqual([]);
 });
 
@@ -294,6 +296,30 @@ it("expireRound moves live to expired exactly once", () => {
   expect(expireRound(state)).toEqual({ ok: true });
   expect(state.round.phase).toBe("expired");
   expect(expireRound(state).error).toBeDefined();
+});
+
+it("expireRound sets a persisted expired flag that round-trips through JSON", () => {
+  const state = playingState();
+  setQuestion(state, "¿5×5?");
+  startRound(state);
+  expect(state.round.expired).toBe(false);
+  expect(expireRound(state)).toEqual({ ok: true });
+  expect(state.round.expired).toBe(true);
+  // The flag survives serialize/deserialize (the whole bug: it lived in a
+  // module variable and died on refresh).
+  const restored = deserialize(serialize(state));
+  expect(restored.round.expired).toBe(true);
+  expect(restored.round.phase).toBe("expired");
+});
+
+it("nextQuestion clears the expired flag back to draft defaults", () => {
+  const state = playingState();
+  setQuestion(state, "¿5×5?");
+  startRound(state);
+  expireRound(state);
+  expect(state.round.expired).toBe(true);
+  expect(nextQuestion(state)).toEqual({ ok: true });
+  expect(state.round.expired).toBe(false);
 });
 
 it("awardPoints validates like addPoints and works from draft, live and expired", () => {
@@ -410,6 +436,7 @@ it("endContest discards the round and freezes", () => {
     seconds: 30,
     phase: "draft",
     undoLog: [],
+    expired: false,
   });
   expect(endContest(state).error).toBeDefined();
 });

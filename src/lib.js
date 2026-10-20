@@ -189,7 +189,7 @@ export function addPoints(state, id, amount) {
 }
 
 export function initialRound(seconds = 30) {
-  return { question: "", seconds, phase: "draft", undoLog: [] };
+  return { question: "", seconds, phase: "draft", undoLog: [], expired: false };
 }
 
 const UNDO_LOG_CAP = 20;
@@ -225,6 +225,10 @@ export function expireRound(state) {
     return { error: "La pregunta no está en directo" };
   }
   round.phase = "expired";
+  // Persisted alongside the phase: the module-level flag died on refresh, so
+  // an answered+undone round lost its "⏱ ¡Tiempo!" strip message. The round
+  // ships inside state, so serialize carries it untouched.
+  round.expired = true;
   return { ok: true };
 }
 
