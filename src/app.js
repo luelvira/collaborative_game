@@ -410,10 +410,11 @@ function wireHome() {
   if (fresh) {
     fresh.addEventListener("click", () => {
       state = api.newState();
-      persist();
+      // A brand-new session only persists once the user edits something, so
+      // "Continue last session" stays disabled for untouched fresh setups.
       showView("#view-setup");
       const gc = $("#group-count");
-      if (gc) gc.value = "2";
+      if (gc) gc.value = String(state.groups.length);
       renderSetup();
       renderHistory();
     });

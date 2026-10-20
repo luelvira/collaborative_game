@@ -19,8 +19,7 @@ test("setup: choose N, name groups, add players, start contest", async ({ page }
   await page.goto("/");
   await page.locator("#fresh-session").click();
 
-  // nothing renders until N is picked (fresh setup has no groups)
-  await expect(page.locator("#setup-groups input.setup-group-name")).toHaveCount(0);
+  await expect(page.locator("#setup-groups input.setup-group-name")).toHaveCount(2);
   const groupCount = page.locator("#group-count");
   await groupCount.fill("3");
   await groupCount.dispatchEvent("change");

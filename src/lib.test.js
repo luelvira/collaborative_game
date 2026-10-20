@@ -62,7 +62,7 @@ it("colorHue wraps modulo 360", () => {
 });
 
 it("colorFor returns hsl with constant saturation and lightness", () => {
-  const state = newState();
+  const state = newState(() => 0.5);
   setGroupCount(state, 3, () => 0.5);
   const id = state.groups[0].id;
   expect(colorFor(state.startHue, state.groups, id)).toBe("hsl(180, 90%, 60%)");
@@ -77,16 +77,19 @@ it("colorName buckets every 30 degrees over the whole wheel", () => {
   expect(colorName(300)).toBe("magenta");
 });
 
-it("newState starts in setup with empty groups and startHue null", () => {
-  const state = newState();
+it("newState seeds in setup with two color-named groups and a startHue", () => {
+  const state = newState(() => 0.5);
   expect(state.phase).toBe("setup");
-  expect(state.groups).toEqual([]);
-  expect(state.startHue).toBe(null);
+  expect(state.groups.length).toBe(2);
+  expect(state.startHue).toBe(180);
+  expect(state.groups[0].name).toBe("cyan");
+  expect(state.groups[1].name).toBe("red");
+  expect(state.groups[0].id).not.toBe(state.groups[1].id);
   expect(state.startedAt > 0).toBe(true);
 });
 
-it("setGroupCount creates N groups with color names and sets startHue", () => {
-  const state = newState();
+it("setGroupCount recreates N color-named groups, keeping an existing startHue", () => {
+  const state = newState(() => 0.5);
   const res = setGroupCount(state, 3, () => 0.5);
   expect(res).toEqual({ ok: true });
   expect(state.startHue).toBe(180);

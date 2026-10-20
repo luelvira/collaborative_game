@@ -66,16 +66,34 @@ export function makeId(rng = Math.random) {
   return id;
 }
 
-export function newState() {
+export function newState(rng = Math.random) {
+  // Setup starts immediately usable: two color-named groups, ready to rename
+  // and fill with players (nothing persists until the user edits something).
+  const startHue = rng() * 360;
   return {
     startedAt: Date.now(),
     phase: "setup",
-    startHue: null,
-    groups: [],
+    startHue,
+    groups: makeGroups(startHue, MIN_GROUPS, rng),
   };
 }
 
 /** Create or resize to N groups; colors appear only once N is chosen. */
+// Groups evenly spaced on the color wheel, auto-named by their hue.
+function makeGroups(startHue, n, rng = Math.random) {
+  const groups = [];
+  for (let i = 0; i < n; i++) {
+    const hue = colorHue(startHue, n, i);
+    groups.push({
+      id: makeId(rng),
+      name: colorName(hue),
+      members: [],
+      points: 0,
+    });
+  }
+  return groups;
+}
+
 export function setGroupCount(state, n, rng = Math.random) {
   if (state.phase !== "setup") return { error: "Not in setup" };
   if (!Number.isInteger(n) || n < MIN_GROUPS || n > MAX_GROUPS) {
@@ -83,16 +101,7 @@ export function setGroupCount(state, n, rng = Math.random) {
   }
   if (state.groups.length === n && state.startHue != null) return { ok: true };
   if (state.startHue == null) state.startHue = rng() * 360;
-  state.groups = [];
-  for (let i = 0; i < n; i++) {
-    const hue = colorHue(state.startHue, n, i);
-    state.groups.push({
-      id: makeId(rng),
-      name: colorName(hue),
-      members: [],
-      points: 0,
-    });
-  }
+  state.groups = makeGroups(state.startHue, n, rng);
   return { ok: true };
 }
 

@@ -118,6 +118,40 @@ it("adding groups without typing names gives them their color names", async () =
   }
 });
 
+it("fresh setup shows two groups immediately", async () => {
+  const { document, window, cleanup } = bootWithSeededState(() => newState());
+  try {
+    await appModule();
+    document.querySelector("#fresh-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    const names = [...document.querySelectorAll("#setup-groups input.setup-group-name")].map((n) => n.value);
+    expect(names.length).toBe(2);
+    expect(names[0].length).toBeGreaterThan(0);
+    expect(names[1].length).toBeGreaterThan(0);
+    expect(document.querySelector("#group-count").value).toBe("2");
+  } finally {
+    cleanup();
+  }
+});
+
+it("a fresh untouched session is not saved until the user edits something", async () => {
+  const { document, window, store, cleanup } = bootWithSeededState(() => newState());
+  try {
+    await appModule();
+    // Emulate a first visit: drop whatever is saved so nothing exists yet.
+    store.delete("contestBoard:current");
+    document.querySelector("#fresh-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    expect(store.get("contestBoard:current")).toBeFalsy();
+    // renaming is an edit -> persists
+    const nameInput = document.querySelector("#setup-groups input.setup-group-name");
+    nameInput.value = "Team A";
+    nameInput.dispatchEvent(new window.Event("change", { bubbles: true }));
+    const saved = JSON.parse(store.get("contestBoard:current"));
+    expect(saved.groups.some((g) => g.name === "Team A")).toBe(true);
+  } finally {
+    cleanup();
+  }
+});
+
 it("adding a named group (via seeded state) still renders its name", async () => {
   const { document, window, cleanup } = bootWithSeededState(seedThreeGroupsSevenUsers);
   try {
@@ -161,7 +195,7 @@ it("reset archives the play with start timestamp and restarts", async () => {
     expect([1, 2].includes(runs[0].winners.length)).toBe(true);
     const fresh = JSON.parse(store.get("contestBoard:current"));
     expect(fresh.phase).toBe("setup");
-    expect(fresh.groups.length).toBe(0);
+    expect(fresh.groups.length).toBe(2);
     expect(fresh.startedAt > runs[0].startedAt).toBe(true);
     expect(document.querySelector("#winner").hidden).toBe(true);
     expect(document.querySelector("#history").hidden).toBe(false);
@@ -242,8 +276,8 @@ it("clicking +1 updates the score and persists", async () => {
 
 it("runner-up uses color names when groups have no explicit name", async () => {
   const { document, window, cleanup } = bootWithSeededState(() => {
-    const s = newState();
-    setGroupCount(s, 2, () => 0.5);
+    // newState(() => 0.5) seeds two groups on hue 180: "cyan" and "red".
+    const s = newState(() => 0.5);
     addMember(s, s.groups[0].id, "alice", () => 0);
     addMember(s, s.groups[1].id, "bob", () => 0.5);
     startContest(s);
