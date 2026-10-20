@@ -20,7 +20,7 @@ test.describe("contest board end-to-end", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await page.evaluate(() => {
-      for (const key of ["contestBoard:current", "contestBoard:history"]) {
+      for (const key of ["contestBoard:current", "contestBoard:history", "contestBoard:sound"]) {
         window.localStorage.removeItem(key);
       }
     });
@@ -71,6 +71,32 @@ test.describe("contest board end-to-end", () => {
     await page.reload();
     await page.locator("#continue-session").click();
     await expect(page.locator("#view-play .card").first().locator(".score")).toHaveText("1");
+  });
+
+  test("sound toggle persists glyph and state across a reload", async ({ page }) => {
+    await setupContest(page, 2, ["ana"]);
+    const toggle = page.locator("#sound-toggle");
+    // boots ON per spec (no stored preference)
+    await expect(toggle).toHaveAttribute("data-sound", "on");
+    await expect(toggle).toHaveText("🔊");
+
+    // off → survives a full page reload (glyph + data-sound + storage)
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("data-sound", "off");
+    await expect(toggle).toHaveText("🔇");
+    expect(await page.evaluate(() => window.localStorage.getItem("contestBoard:sound"))).toBe("off");
+    await page.reload();
+    await page.locator("#continue-session").click();
+    await expect(page.locator("#view-play")).toBeVisible();
+    const reloaded = page.locator("#sound-toggle");
+    await expect(reloaded).toHaveAttribute("data-sound", "off");
+    await expect(reloaded).toHaveText("🔇");
+
+    // back on → also persists
+    await reloaded.click();
+    await page.reload();
+    await page.locator("#continue-session").click();
+    await expect(page.locator("#sound-toggle")).toHaveAttribute("data-sound", "on");
   });
 
   test("end contest announces the winner and archives the play back home", async ({ page }) => {
@@ -130,7 +156,7 @@ test.describe("franja de pregunta en la vista de juego", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await page.evaluate(() => {
-      for (const key of ["contestBoard:current", "contestBoard:history"]) {
+      for (const key of ["contestBoard:current", "contestBoard:history", "contestBoard:sound"]) {
         window.localStorage.removeItem(key);
       }
     });

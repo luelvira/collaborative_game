@@ -1,19 +1,24 @@
 "use strict";
 
 import * as lib from "./lib.js";
+import { sound } from "./sound.js";
 
 // Mutable façade so tests can sabotage a single action without rewriting ESM bindings.
 export const api = { ...lib };
 
 const CURRENT_KEY = "contestBoard:current";
-const SOUND_KEY = "contestBoard:soundOn";
 const $ = (sel) => document.querySelector(sel);
 const els = {};
 
-// Task 4 seam: the sound module does not exist yet. Task 4 fills these two
-// bodies (import { sound } from "./sound.js") without touching call sites.
-function notifyExpiry() {}
-function notifyAward() {}
+// Task 4 seam (filled): the sound module guards internally (enabled check +
+// try/catch), so these callers stay unconditional one-liners. Expiry plays
+// the falling two-tone chime; an award plays the brighter rising blip.
+function notifyExpiry() {
+  sound.timeUp();
+}
+function notifyAward() {
+  sound.award();
+}
 
 // Question strip timing — never persisted: a refresh restarts the countdown
 // in full (spec decision), and expiry must not re-fire after a reload.
@@ -179,16 +184,15 @@ function celebrate(card) {
   else setTimeout(clean, 900);
 }
 
-// Sound toggle: persistence only here — Task 4's sound.js reads the same key.
-function soundOn() {
-  return localStorage.getItem(SOUND_KEY) !== "0";
-}
-
+// Sound toggle: owner of the state contract — key `contestBoard:sound`
+// ("on"/"off", default on) inside sound.js, plus the `data-sound` attribute
+// and glyph on the button rendered here.
 function updateSoundToggle() {
   const btn = $("#sound-toggle");
   if (!btn) return;
-  const on = soundOn();
+  const on = sound.enabled();
   btn.textContent = on ? "🔊" : "🔇";
+  btn.setAttribute("data-sound", on ? "on" : "off");
   btn.setAttribute("aria-label", on ? "Sonido activado" : "Sonido desactivado");
 }
 
@@ -197,7 +201,7 @@ function wireSound() {
   if (!btn) return;
   updateSoundToggle();
   btn.addEventListener("click", () => {
-    localStorage.setItem(SOUND_KEY, soundOn() ? "0" : "1");
+    sound.setEnabled(!sound.enabled());
     updateSoundToggle();
   });
 }
