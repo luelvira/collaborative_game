@@ -253,6 +253,25 @@ it("setQuestion trims the text, requires playing phase, allows empty in draft", 
   expect(setQuestion(frozen, "hola").error).toBe("Concurso no en juego");
 });
 
+it("setQuestion is only allowed while the round is in draft", () => {
+  const state = playingState();
+  setQuestion(state, "¿Cuánto es 2+2?");
+  startRound(state);
+  const res = setQuestion(state, "¿Cambiada en directo?");
+  expect(res).toEqual({ error: "La ronda no está en borrador" });
+  expect(state.round.question).toBe("¿Cuánto es 2+2?");
+  // Same restriction from expired and answered.
+  expireRound(state);
+  expect(setQuestion(state, "x").error).toBe("La ronda no está en borrador");
+  awardPoints(state, state.groups[0].id);
+  expect(setQuestion(state, "x").error).toBe("La ronda no está en borrador");
+  expect(state.round.question).toBe("¿Cuánto es 2+2?");
+  // Back to draft: editing works again.
+  nextQuestion(state);
+  expect(setQuestion(state, "Nueva")).toEqual({ ok: true });
+  expect(state.round.question).toBe("Nueva");
+});
+
 it("startRound requires playing, a non-empty question, and goes live", () => {
   const state = newState();
   setGroupCount(state, 2, () => 0.5);

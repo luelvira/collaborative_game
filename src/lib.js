@@ -198,8 +198,12 @@ const UNDO_LOG_CAP = 20;
 
 export function setQuestion(state, text) {
   if (state.phase !== "playing") return { error: "Concurso no en juego" };
-  // Draft again from live/expired is the professor editing: keep it allowed.
-  state.round.question = (text ?? "").trim();
+  const round = state.round;
+  // Editing is a draft-time act: once live/answered/expired the question is fixed.
+  if (!round || round.phase !== "draft") {
+    return { error: "La ronda no está en borrador" };
+  }
+  round.question = (text ?? "").trim();
   return { ok: true };
 }
 
