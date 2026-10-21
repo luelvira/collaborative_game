@@ -64,6 +64,22 @@
     border-color: var(--color-accent);
   }
 
+  /* Keyboard visibility (WCAG 2.4.7): the board is used with a presenter
+     remote, so keyboard and click must be distinguishable against the flat
+     surfaces. */
+  button:focus-visible,
+  input:focus-visible {
+    outline: 3px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  /* Nice-by-default gray placeholders sit under 4.5:1 on the dark surfaces —
+     paint them with the AA-checked dim text color. */
+  input::placeholder {
+    color: var(--color-text-dim);
+    opacity: 1;
+  }
+
   button {
     cursor: pointer;
     transition: transform 0.06s ease, filter 0.15s ease, background 0.15s ease;
@@ -123,9 +139,9 @@
   .home-kicker {
     margin: 0;
     text-transform: uppercase;
-    letter-spacing: 0.3em;
+    letter-spacing: 0.28em;
     color: var(--color-accent);
-    font-size: 0.9rem;
+    font-size: 1.05rem;
     font-weight: 700;
   }
 
@@ -278,10 +294,11 @@
   }
 
   .control label {
-    font-size: 0.8rem;
+    font-size: 0.95rem;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.08em;
     color: var(--color-text-dim);
+    font-weight: 700;
   }
 
   .control-row {
@@ -355,7 +372,7 @@
     gap: 0.5rem;
   }
 
-  .card-head h3 {
+  .card-head h2 {
     margin: 0;
     font-family: var(--font-display);
     font-size: 2rem;
@@ -491,9 +508,9 @@
   }
 
   .podium {
-    width: min(100%, 34rem);
+    width: min(100%, 44rem);
     text-align: center;
-    padding: 2.5rem 1.75rem;
+    padding: 2.25rem 1.5rem;
     background: var(--color-surface);
     border: 1px solid var(--color-line);
     border-top: 3px solid var(--color-accent);
@@ -504,9 +521,9 @@
   .podium-title {
     margin: 0;
     text-transform: uppercase;
-    letter-spacing: 0.28em;
+    letter-spacing: 0.24em;
     color: var(--color-accent);
-    font-size: 0.9rem;
+    font-size: 1.05rem;
     font-weight: 700;
   }
 
@@ -522,19 +539,128 @@
   #winner-members {
     list-style: none;
     padding: 0;
-    margin: 0.5rem 0 1.25rem;
+    margin: 0.5rem auto 0;
     color: var(--color-text-dim);
     display: flex;
     flex-wrap: wrap;
     gap: 0.4rem 1rem;
     justify-content: center;
-    font-size: 1.1rem;
+    max-width: 40rem;
+    font-size: 1.15rem;
   }
 
-  .runner-up {
-    color: var(--color-text-dim);
-    margin: 0 0 1.5rem;
-    font-size: 1.1rem;
+  /* ===== Final podium: top-3 steps + ranked list below =====
+     Text always sits on solid blocks, dark ink on the bright chips and white
+     on the dark surfaces — WCAG AA or better everywhere, sized for a
+     washed-out projector. */
+
+  .podium-steps {
+    list-style: none;
+    margin: 1.25rem 0 0.75rem;
+    padding: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 0.9rem;
+  }
+
+  .podium-steps .step {
+    --team-color: var(--color-accent);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.35rem;
+    width: min(9.5rem, 28vw);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-line);
+    border-top: 10px solid var(--team-color);
+    border-radius: 14px 14px 0 0;
+    padding: 1rem 0.75rem 0.85rem;
+    min-width: 0;
+  }
+
+  .podium-steps .step[data-place="1"] {
+    order: 2;
+    min-height: 11rem;
+  }
+
+  .podium-steps .step[data-place="2"] {
+    order: 1;
+    min-height: 8rem;
+  }
+
+  .podium-steps .step[data-place="3"] {
+    order: 3;
+    min-height: 6.5rem;
+  }
+
+  .step-place {
+    background: var(--color-accent);
+    color: var(--color-ink);
+    font-weight: 800;
+    font-size: 1.15rem;
+    padding: 0.15rem 0.9rem;
+    border-radius: 999px;
+    letter-spacing: 0.05em;
+  }
+
+  .step-name {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.35rem;
+    line-height: 1.15;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+
+  .step-score {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+    font-size: clamp(2.4rem, 6vw, 3.4rem);
+    line-height: 1;
+    color: var(--color-text);
+  }
+
+  .ranking {
+    list-style: none;
+    margin: 0.5rem 0 1.25rem;
+    padding: 0 0.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .ranking li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-line);
+    border-radius: 10px;
+    padding: 0.6rem 0.9rem;
+    font-size: 1.15rem;
+  }
+
+  .ranking .rank {
+    font-weight: 800;
+    min-width: 2.4rem;
+    color: var(--color-accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ranking .rank-name {
+    flex: 1;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ranking .rank-score {
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
   }
 
   .history {
@@ -544,9 +670,9 @@
   }
 
   .history h2 {
-    font-size: 0.9rem;
+    font-size: 1rem;
     text-transform: uppercase;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.1em;
     color: var(--color-text-dim);
     font-weight: 700;
   }
@@ -668,6 +794,14 @@
 
   #q-seconds {
     width: 6rem;
+  }
+
+  .podium-steps {
+    flex-wrap: wrap;
+  }
+
+  .podium-steps .step {
+    width: 7.25rem;
   }
 }
 
@@ -876,12 +1010,13 @@
   gap: 0.75rem;
 }
 
-/* Professor control, not a game button: a small dim pill (spec). */
+/* Professor control, not a game button: a small dim pill (spec). Size kept
+   readable — 1rem is the smallest informative text on the projector. */
 #undo-award {
   background: transparent;
   border: 1px solid var(--color-line);
   color: var(--color-text-dim);
-  font-size: 0.7rem;
+  font-size: 0.95rem;
   font-weight: 600;
   border-radius: 999px;
   padding: 0.4rem 0.85rem;

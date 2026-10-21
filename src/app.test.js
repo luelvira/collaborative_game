@@ -162,7 +162,7 @@ it("adding a named group (via seeded state) still renders its name", async () =>
   try {
     await appModule();
     document.querySelector("#continue-session").dispatchEvent(new window.Event("click", { bubbles: true }));
-    const names = [...document.querySelectorAll("#board .card .card-head h3")].map((n) => n.textContent);
+    const names = [...document.querySelectorAll("#board .card .card-head h2")].map((n) => n.textContent);
     expect(names.sort()).toEqual(["Alpha", "Bravo", "Charlie"].sort());
   } finally {
     cleanup();
@@ -288,6 +288,60 @@ it("clicking +1 updates the score and persists", async () => {
   }
 });
 
+it("the final screen shows a top-3 podium and the rest ranked with scores", async () => {
+  const { document, window, cleanup } = bootWithSeededState(frozenSeed);
+  try {
+    await appModule();
+    document.querySelector("#continue-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    expect(document.querySelector("#winner").hidden).toBe(false);
+    // Podium: three steps, each with place badge, name and score visible.
+    const steps = [...document.querySelectorAll("#podium-steps .step")];
+    expect(steps.map((s) => s.dataset.place)).toEqual(["2", "1", "3"]);
+    expect(steps.map((s) => s.querySelector(".step-place").textContent)).toEqual(["2º", "1º", "3º"]);
+    expect(steps.map((s) => s.querySelector(".step-score").textContent)).toEqual(["3", "3", "1"]);
+    for (const s of steps) {
+      expect(s.querySelector(".step-name").textContent.length).toBeGreaterThan(0);
+    }
+
+    // Ranking: the rest of teams sorted desc with their scores — here every
+    // team is inside the podium, so the list is empty.
+    expect(document.querySelectorAll("#ranking li").length).toBe(0);
+  } finally {
+    cleanup();
+  }
+});
+
+it("groups outside the podium land in the ranked list with scores", async () => {
+  const { document, window, cleanup } = bootWithSeededState(() => {
+    const s = newState(() => 0.5);
+    setGroupCount(s, 5, () => 0.5);
+    s.groups.forEach((g, i) => {
+      s.groups[i].members = [`p${i}`];
+    });
+    startContest(s);
+    [4, 3, 2, 1, 0].forEach((points, i) => {
+      addPoints(s, s.groups[i].id, points);
+    });
+    endContest(s);
+    return s;
+  });
+  try {
+    await appModule();
+    document.querySelector("#continue-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    expect(document.querySelector("#winner").hidden).toBe(false);
+    expect(document.querySelectorAll("#podium-steps .step").length).toBe(3);
+    // Ranked list: groups 4º/5º with visible scores, descending order.
+    const rows = [...document.querySelectorAll("#ranking li")];
+    expect(rows.length).toBe(2);
+    expect(rows[0].querySelector(".rank").textContent).toBe("4º");
+    expect(rows[0].querySelector(".rank-score").textContent).toBe("1 punto");
+    expect(rows[1].querySelector(".rank").textContent).toBe("5º");
+    expect(rows[1].querySelector(".rank-score").textContent).toBe("0 puntos");
+  } finally {
+    cleanup();
+  }
+});
+
 it("runner-up uses color names when groups have no explicit name", async () => {
   const { document, window, cleanup } = bootWithSeededState(() => {
     // newState(() => 0.5) seeds two groups on hue 180: "cian" and "rojo".
@@ -303,7 +357,18 @@ it("runner-up uses color names when groups have no explicit name", async () => {
     await appModule();
     document.querySelector("#continue-session").dispatchEvent(new window.Event("click", { bubbles: true }));
     document.querySelector("#end-contest").dispatchEvent(new window.Event("click", { bubbles: true }));
-    expect(document.querySelector("#runner-up").textContent).toMatch(/rojo/);
+    // With two groups the podium shows "2º | 1º" and the winner headline keeps
+    // the auto color names (raw names may be null; display names derive).
+    const places = [...document.querySelectorAll("#podium-steps .step")].map(
+      (s) => s.querySelector(".step-place").textContent,
+    );
+    expect(places).toEqual(["2º", "1º"]);
+    const names = [...document.querySelectorAll("#podium-steps .step-name")].map(
+      (n) => n.textContent,
+    );
+    expect(names).toContain("cian eléctrico");
+    expect(names).toContain("rojo coral");
+    expect(document.querySelector("#winner-name").textContent).toBe("cian eléctrico");
   } finally {
     cleanup();
   }

@@ -12,18 +12,25 @@ const els = {};
 
 // Task 4 seam (filled): the sound module guards internally (enabled check +
 // try/catch), so these callers stay unconditional one-liners. Expiry plays
-// the falling two-tone chime; an award plays the brighter rising blip.
+// the 3-second falling closure chime; an award plays the short festive
+// fanfare; freezing the contest plays the long first-place victory tune.
 function notifyExpiry() {
   sound.timeUp();
 }
 function notifyAward() {
   sound.award();
 }
+function notifyVictory() {
+  sound.victory();
+}
 
 // Question strip timing — never persisted: a refresh restarts the countdown
 // in full (spec decision), and expiry must not re-fire after a reload.
 let roundStartAt = 0;
 let tickTimer = null;
+// Audio cue memory for the countdown (also never persisted): the halfway beep
+// fires once per round, and the heartbeat fires once per remaining second.
+let cueState = { halfFired: false, lastBeatSec: null };
 // The expired-round memory itself IS persisted: round.expired (lib.js) so it
 // survives a refresh — the strip keeps "⏱ ¡Tiempo!" as its source message
 // after every award has been undone.
@@ -52,7 +59,31 @@ function stopRoundTick() {
 function startRoundTick() {
   stopRoundTick();
   roundStartAt = Date.now();
+  cueState = { halfFired: false, lastBeatSec: null };
   tickTimer = setInterval(onRoundTick, 200);
+}
+
+// Pure seam for the audio cues. At each tick the countdown decides between:
+// — the halfway tension beep ("tempo bajo"), fired exactly once when the
+//   remaining time first drops to 50 % of the total (inclusive edge);
+// — the danger heartbeat, one beat per remaining second in the last 5 s
+//   (same tension alarm family), intensifying as it goes: the caller maps
+//   sec → level = 5 − sec, so 5 s is the softest beat and 1 s the strongest.
+export function countdownCues(remaining, total, s = {}) {
+  const cue = { halfTime: false, heartbeat: null };
+  if (total <= 0 || remaining <= 0) return cue;
+  if (!s.halfFired && remaining <= total / 2) cue.halfTime = true;
+  const sec = Math.ceil(remaining / 1000);
+  if (sec <= 5 && sec !== s.lastBeatSec) cue.heartbeat = sec;
+  return cue;
+}
+
+function applyCues(remaining, total) {
+  const cue = countdownCues(remaining, total, cueState);
+  if (cue.halfTime) cueState.halfFired = true;
+  if (cue.heartbeat !== null) cueState.lastBeatSec = cue.heartbeat;
+  if (cue.halfTime) sound.halfTime();
+  if (cue.heartbeat !== null) sound.heartbeat(5 - cue.heartbeat);
 }
 
 function onRoundTick() {
@@ -72,6 +103,7 @@ function onRoundTick() {
     return;
   }
   paintQTimer(remaining, total);
+  applyCues(remaining, total);
 }
 
 // Pure seam for the countdown tones: "flat" keeps the plain white pill/fill,
@@ -115,12 +147,15 @@ function paintQTimer(remaining, total) {
   applyQTimerTone(countdownTone(remaining, total));
 }
 
-// Message of the after-view: the most recent award on the undo log wins; an
-// empty log returns the round to its source message (the time out, or nothing
-// at all when the point came before any question was launched).
+// Message of the after-view: the most recent award of the CURRENT question
+// wins; anything older (the log survives nextQuestion so those awards stay
+// undoable) must not mask this round's own story — an empty current window
+// returns the round to its source message (the time out, or nothing at all
+// when the point came before any question was launched).
 function afterMessage() {
   const round = state.round;
-  const last = round.undoLog[round.undoLog.length - 1];
+  const mine = round.undoLog.slice(round.logStart ?? 0);
+  const last = mine[mine.length - 1];
   if (last) {
     const name = api.groupName(state.startHue, state.groups, last.groupId);
     return { text: `¡Punto para ${name}!`, kind: "award" };
@@ -307,6 +342,9 @@ function toast(message) {
   if (!node) {
     node = document.createElement("div");
     node.id = "toast";
+    // Screen readers announce the transient message like a status update.
+    node.setAttribute("role", "status");
+    node.setAttribute("aria-live", "polite");
     document.body.appendChild(node);
   }
   node.textContent = message;
@@ -462,6 +500,9 @@ function setupGroupEditor(group) {
       rm.type = "button";
       rm.className = "rm";
       rm.textContent = "✕";
+      // WAVE: the glyph alone carries no meaning — label it for the player.
+      rm.setAttribute("aria-label", `Quitar a ${m}`);
+      rm.title = `Quitar a ${m}`;
       rm.addEventListener("click", () => {
         const res = api.removeMember(state, group.id, m);
         if (res && res.error) {
@@ -495,7 +536,7 @@ function cardTemplatePlay(group) {
   card.innerHTML = `
     <div class="card-body">
       <div class="card-head">
-        <h3></h3>
+        <h2></h2>
         <span class="crown"></span>
       </div>
       <div class="score"></div>
@@ -517,18 +558,21 @@ function patchCardPlay(card, group, { isNew = false } = {}) {
     card.style.setProperty("--team-color", color);
   }
   card.style.borderTop = `10px solid ${color}`;
-  const h3 = card.querySelector(".card-head h3");
+  const h3 = card.querySelector(".card-head h2");
   if (h3) {
     h3.textContent = api.groupName(state.startHue, state.groups, group.id);
   }
   const crownEl = card.querySelector(".crown");
   if (crownEl) {
-    // Decorative leader crown: strict leader with at least one point.
+    // Decorative leader crown: strict leader with at least one point, and
+    // purely decorative for assistive tech (the name + score already say it).
     const leaderIds = api.winners(state);
     const isLeader = leaderIds.length === 1 && leaderIds[0] === group.id && group.points > 0;
-    if (crownEl.textContent !== (isLeader ? "👑" : "")) {
-      crownEl.textContent = isLeader ? "👑" : "";
+    const glyph = isLeader ? "👑" : "";
+    if (crownEl.textContent !== glyph) {
+      crownEl.textContent = glyph;
     }
+    crownEl.setAttribute("aria-hidden", "true");
   }
 
   const scoreNode = card.querySelector(".score");
@@ -634,23 +678,84 @@ function updatePlayChrome() {
   }
 }
 
+// Podium step: one li per top-3 group with its place badge (1º/2º/3º), name
+// and score — all information lives in text, no color-only encoding, and the
+// team color is the flat block under text in the dark ink-on-color style.
+function podiumStep(group, place) {
+  const li = document.createElement("li");
+  li.className = "step";
+  li.dataset.place = String(place);
+  li.style.setProperty("--team-color", api.colorFor(state.startHue, state.groups, group.id));
+  const placeEl = document.createElement("span");
+  placeEl.className = "step-place";
+  placeEl.textContent = `${place}º`;
+  const nameEl = document.createElement("span");
+  nameEl.className = "step-name";
+  nameEl.textContent = api.groupName(state.startHue, state.groups, group.id);
+  const scoreEl = document.createElement("span");
+  scoreEl.className = "step-score";
+  scoreEl.textContent = String(group.points);
+  li.append(placeEl, nameEl, scoreEl);
+  return li;
+}
+
+function rankingRow(group, place) {
+  const li = document.createElement("li");
+  const rankEl = document.createElement("span");
+  rankEl.className = "rank";
+  rankEl.textContent = `${place}º`;
+  const nameEl = document.createElement("span");
+  nameEl.className = "rank-name";
+  nameEl.textContent = api.groupName(state.startHue, state.groups, group.id);
+  const scoreEl = document.createElement("span");
+  scoreEl.className = "rank-score";
+  // Spanish plural: "1 punto" / "0/2 puntos".
+  scoreEl.textContent = `${group.points} ${group.points === 1 ? "punto" : "puntos"}`;
+  li.append(rankEl, nameEl, scoreEl);
+  return li;
+}
+
+// Final screen: a classic two-wing podium with the top-3 groups (place badge,
+// name and score on every step) and the remaining teams ranked by score below
+// — every group's score is visible somewhere on the screen (spec).
 function renderWinner() {
   const winnerEl = $("#winner");
-  const winnerIds = api.winners(state);
-  const winnerName = $("#winner-name");
-  const winnerMembers = $("#winner-members");
-  const runnerUp = $("#runner-up");
+  const podiumEl = $("#podium-steps");
+  const rankingEl = $("#ranking");
   if (!winnerEl) return;
   if (state.phase !== "frozen") {
     winnerEl.hidden = true;
     return;
   }
+  // Stable sort keeps original group order inside a tie.
+  const ranked = [...(state.groups || [])].sort((a, b) => b.points - a.points);
+  const top = ranked.slice(0, 3);
+  const rest = ranked.slice(top.length);
+
+  if (podiumEl) {
+    podiumEl.replaceChildren();
+    // Classic display: 2º hides behind the taller 1º on the left, 3º on the
+    // right; with two groups it is "2º left, 1º right".
+    const visual = top.length === 3 ? [top[1], top[0], top[2]] : top.slice().reverse();
+    visual.forEach((group) => {
+      podiumEl.append(podiumStep(group, ranked.indexOf(group) + 1));
+    });
+  }
+  if (rankingEl) {
+    rankingEl.replaceChildren(
+      ...rest.map((group, i) => rankingRow(group, top.length + i + 1)),
+    );
+  }
+
+  const winnerIds = api.winners(state);
+  const winnerName = $("#winner-name");
+  const winnerMembers = $("#winner-members");
   const names = winnerIds
     .map((id) => api.groupName(state.startHue, state.groups, id))
     .filter(Boolean);
   if (winnerName) winnerName.textContent = names.join(" & ") || "Empate";
   if (winnerMembers) {
-    winnerMembers.innerHTML = "";
+    winnerMembers.replaceChildren();
     state.groups
       .filter((g) => winnerIds.includes(g.id))
       .forEach((g) => {
@@ -660,15 +765,6 @@ function renderWinner() {
           winnerMembers.appendChild(li);
         });
       });
-  }
-  if (runnerUp) {
-    const rest = state.groups
-      .filter((g) => !winnerIds.includes(g.id))
-      .map((g) => `${api.groupName(state.startHue, state.groups, g.id)} (${g.points})`)
-      .join(", ");
-    // Dictionary string kept even on ties: with a tie the list of the rest
-    // still reads as the runners-up ("Segundo puesto: {names}"), just shared.
-    runnerUp.textContent = rest ? `Segundo puesto: ${rest}` : "";
   }
   winnerEl.hidden = false;
 }
@@ -846,6 +942,9 @@ function wirePlay() {
       persist();
       renderBoard();
       renderWinner();
+      // The victory screen deserves the full first-place fanfare; nothing
+      // plays when the end call is refused (error path already returned).
+      notifyVictory();
     });
   }
 }
@@ -877,7 +976,8 @@ function boot() {
     ["winner", "#winner"],
     ["winnerName", "#winner-name"],
     ["winnerMembers", "#winner-members"],
-    ["runnerUp", "#runner-up"],
+    ["podiumSteps", "#podium-steps"],
+    ["ranking", "#ranking"],
     ["reset", "#reset"],
     ["status", "#status-line"],
   ].forEach(([key, sel]) => {

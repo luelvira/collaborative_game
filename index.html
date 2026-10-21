@@ -3,15 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tablero de Concurso</title>
+  <title>Saber y compilar</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🏆</text></svg>">
 </head>
 <body>
   <section id="view-home" class="view view-home">
     <div class="home-stage">
-      <p class="home-kicker">Concurso en directo para el aula</p>
-      <h1 class="home-title">Tablero de Concurso</h1>
-      <p class="home-sub">Marcador preparado para proyectar. Todo se guarda en este navegador.</p>
+      <h1 class="home-title">Saber y Compilar</h1>
       <div class="home-actions">
         <button type="button" id="continue-session" class="primary home-btn">Continuar la última sesión</button>
         <button type="button" id="fresh-session" class="home-btn">Nueva partida</button>
@@ -23,7 +21,7 @@
   <section id="view-setup" class="view view-setup" hidden>
     <header class="topbar">
       <div class="brand">
-        <h1>Tablero de Concurso</h1>
+        <h1>Saber y Compilar</h1>
         <p class="status">Elige grupos, ponles nombre y añade jugadores</p>
       </div>
       <div class="controls">
@@ -39,7 +37,7 @@
           </div>
         </div>
         <button type="button" id="start-contest" class="primary">Empezar concurso</button>
-        <button type="button" id="setup-home" class="ghost">Inicio</button>
+        <button type="button" id="setup-home" class="ghost">Volver al inicio</button>
       </div>
     </header>
     <div id="setup-groups" class="setup-groups" aria-live="polite"></div>
@@ -48,7 +46,7 @@
   <section id="view-play" class="view view-play" hidden>
     <header class="topbar">
       <div class="brand">
-        <h1>Tablero de Concurso</h1>
+        <h1>Saber y compilar</h1>
         <p id="status-line" class="status">En directo</p>
       </div>
       <div class="controls">
@@ -58,8 +56,8 @@
     </header>
     <section id="q-strip" class="q-strip" hidden>
       <form id="q-draft" hidden>
-        <input id="q-input" type="text" maxlength="200" placeholder="Escribe la pregunta">
-        <input id="q-seconds" type="number" min="5" max="300" step="5" value="30">
+        <input id="q-input" aria-label="Escribe la pregunta" type="text" maxlength="200" placeholder="Escribe la pregunta">
+        <input id="q-seconds" aria-label="Segundos de la ronda" type="number" min="5" max="300" step="5" value="30">
         <button type="submit" id="launch-question" class="primary">Mostrar y arrancar</button>
       </form>
       <div id="q-live" hidden>
@@ -78,15 +76,15 @@
   </section>
 
   <div id="winner" class="overlay" hidden>
-    <div class="podium">
+    <div class="podium" role="dialog" aria-modal="true" aria-labelledby="winner-name">
       <p class="podium-title">Ganador</p>
       <h2 id="winner-name"></h2>
       <ul id="winner-members"></ul>
-      <p id="runner-up" class="runner-up"></p>
+      <ol id="podium-steps" class="podium-steps" aria-label="Podio de los tres primeros grupos"></ol>
+      <ol id="ranking" class="ranking"></ol>
       <button type="button" id="reset" class="danger">Archivar y volver al inicio</button>
     </div>
   </div>
-
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

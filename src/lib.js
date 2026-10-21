@@ -4,10 +4,11 @@ const MAX_GROUPS = 10;
 const MIN_GROUPS = 2;
 const MAX_HISTORY = 20;
 const HISTORY_KEY = "contestBoard:history";
-// 12 hue buckets of 30 degrees each, named clockwise from rojo at 0.
+// 12 hue buckets of 30 degrees each, named clockwise from rojo coral at 0.
 const COLOR_NAMES = [
-  "rojo", "naranja", "amarillo", "lima", "verde", "turquesa",
-  "cian", "celeste", "azul", "violeta", "magenta", "rosa",
+  "rojo coral", "naranja mandarina", "amarillo limón", "verde lima",
+  "verde neón", "turquesa", "cian eléctrico", "azul cielo",
+  "azul eléctrico", "púrpura intenso", "magenta", "rosa chicle",
 ];
 
 export function colorHue(startHue, count, index) {
@@ -95,6 +96,76 @@ function makeGroups(startHue, n, rng = Math.random) {
   return groups;
 }
 
+/**
+ * Balanced target sizes for n groups over a total of t members: every group
+ * gets floor(t/n) or ceil(t/n) members, ceil going to the first groups.
+ * [2, 2, 3] for t=7, n=3.
+ */
+function balancedSizes(t, n) {
+  if (n <= 0) return [];
+  const base = Math.floor(t / n);
+  const extras = t % n;
+  return Array.from({ length: n }, (_, i) => base + (i < extras ? 1 : 0));
+}
+
+/**
+ * Equality-preserving redistribution of members when the group count changes.
+ *
+ * Spec (players must never be lost or reset when N changes): each target ends
+ * with a balanced size (floor/ceil of the total) and the number of players
+ * who change groups is minimized.
+ *
+ * Minimality: a target j can keep at most min(c_j, d_j) of its own members,
+ * and keeping exactly min(c_j, d_j) is always feasible for every target at
+ * once (the displaced pool always matches the remaining deficits, because
+ * both equal total − Σ keeps). So Σ min(c_j, d_j) is the provable maximum of
+ * players who stay put, and this function attains it: every target keeps that
+ * many of its members (in stable original order) and the displaced members
+ * spread over the deficits in transcript order.
+ *
+ * `order` lists every source group (the ones about to disappear included).
+ * `targets` lists the groups that will carry members afterwards, passed with
+ * their ORIGINAL members so real counts are visible (new/empty targets just
+ * have none). Mutates nothing: returns a fresh members array per target,
+ * positional over `targets`.
+ */
+export function redistributeMembers(order, targets) {
+  const total = order.reduce((sum, g) => sum + g.members.length, 0);
+  const sizes = balancedSizes(total, targets.length);
+  const kept = [];
+  const pool = [];
+  targets.forEach((g, i) => {
+    const keep = Math.min(g.members.length, sizes[i]);
+    kept.push(g.members.slice(0, keep));
+    pool.push(...g.members.slice(keep));
+  });
+  for (const g of order) {
+    if (targets.includes(g)) continue; // its keep was already accounted for
+    pool.push(...g.members);
+  }
+  return targets.map((_group, i) => {
+    const out = kept[i].slice();
+    const deficit = sizes[i] - out.length;
+    out.push(...pool.splice(0, deficit));
+    return out;
+  });
+}
+
+/**
+ * After a resize the wheel is re-split, so an auto color-name may no longer
+ * match the group's new hue slot. Auto-named groups (name === the OLD wheel
+ * name for their positional index) drop the explicit name and derive it from
+ * the new split; teacher-set names are never touched.
+ */
+function rederiveAutoNames(groups, oldCount, startHue) {
+  groups.forEach((g, i) => {
+    if (typeof g.name !== "string") return;
+    if (g.name === colorName(colorHue(startHue, oldCount, i))) {
+      g.name = null; // derive fresh from the new hue slot
+    }
+  });
+}
+
 export function setGroupCount(state, n, rng = Math.random) {
   if (state.phase !== "setup") return { error: "Fuera de la preparación" };
   if (!Number.isInteger(n) || n < MIN_GROUPS || n > MAX_GROUPS) {
@@ -102,7 +173,27 @@ export function setGroupCount(state, n, rng = Math.random) {
   }
   if (state.groups.length === n && state.startHue != null) return { ok: true };
   if (state.startHue == null) state.startHue = rng() * 360;
-  state.groups = makeGroups(state.startHue, n, rng);
+  const old = state.groups;
+  if (n > old.length) {
+    // Growing: existing groups keep their identities, fresh color-named
+    // empties join at the end; members are then spread evenly with the
+    // minimal-move redistribution.
+    const added = makeGroups(state.startHue, n, rng).slice(old.length);
+    const merged = [...old, ...added];
+    const redistribution = redistributeMembers(old, merged);
+    state.groups = merged.map((g, i) => ({ ...g, members: redistribution[i] }));
+  } else if (n < old.length) {
+    // Shrinking: the last groups fold into the survivors; nothing is deleted,
+    // so no player is lost.
+    const survivors = old.slice(0, n);
+    const redistribution = redistributeMembers(old, survivors);
+    state.groups = survivors.map((g, i) => ({ ...g, members: redistribution[i] }));
+  } else {
+    state.groups = makeGroups(state.startHue, n, rng);
+  }
+  if (n !== old.length) {
+    rederiveAutoNames(state.groups, old.length, state.startHue);
+  }
   return { ok: true };
 }
 
@@ -189,7 +280,10 @@ export function addPoints(state, id, amount) {
 }
 
 export function initialRound(seconds = 30) {
-  return { question: "", seconds, phase: "draft", undoLog: [], expired: false };
+  // logStart marks where the CURRENT question's awards begin inside undoLog
+  // (the log survives nextQuestion so old awards stay undoable, but the
+  // strip's message must only ever read this question's awards).
+  return { question: "", seconds, phase: "draft", undoLog: [], expired: false, logStart: 0 };
 }
 
 const UNDO_LOG_CAP = 20;
@@ -261,10 +355,11 @@ export function undoLastAward(state) {
 
 export function nextQuestion(state) {
   if (state.phase !== "playing") return { error: "Concurso no en juego" };
-  // undoLog survives the change so an award can still be undone.
+  // undoLog survives the change so an award can still be undone; logStart
+  // moves past it so the expired/answered messages ignore previous rounds.
   const seconds = state.round ? state.round.seconds : 30;
   const undoLog = state.round ? state.round.undoLog : [];
-  state.round = { ...initialRound(seconds), undoLog };
+  state.round = { ...initialRound(seconds), undoLog, logStart: undoLog.length };
   return { ok: true };
 }
 

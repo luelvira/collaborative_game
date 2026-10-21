@@ -33,10 +33,10 @@ it("sound.enabled()/setEnabled() survive a storage whose access throws", () => {
   }
 });
 
-it("sound.timeUp()/award() never throw when no AudioContext exists", () => {
+it("sound.timeUp()/award()/halfTime()/heartbeat()/victory() never throw when no AudioContext exists", () => {
   const realWindow = globalThis.window;
   // A window without any audio constructor simulates an audio-less browser;
-  // timeUp()/award() call the guarded play() internally.
+  // every public method calls the guarded play() internally.
   Object.defineProperty(globalThis, "window", {
     value: {},
     configurable: true,
@@ -45,6 +45,9 @@ it("sound.timeUp()/award() never throw when no AudioContext exists", () => {
   try {
     expect(() => sound.timeUp()).not.toThrow();
     expect(() => sound.award()).not.toThrow();
+    expect(() => sound.halfTime()).not.toThrow();
+    expect(() => sound.heartbeat(3)).not.toThrow();
+    expect(() => sound.victory()).not.toThrow();
   } finally {
     Object.defineProperty(globalThis, "window", {
       value: realWindow,

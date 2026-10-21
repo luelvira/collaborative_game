@@ -3,6 +3,9 @@
 // Web Audio oscillator sounds (spec: sound exists for engagement, boots ON,
 // the teacher can turn it off; the preference persists in localStorage).
 // No audio files are ever loaded — everything is synthesized on the fly.
+// Palette is a festive Mario Kart-style set: bright rising fanfares for
+// points and victory, sharp tension beeps for the countdown's half-way mark
+// and heartbeat, and a long 3 s "time over" closure chime.
 
 const SOUND_KEY = "contestBoard:sound";
 
@@ -33,9 +36,10 @@ function setEnabled(on) {
   }
 }
 
-// Play a short sequence of fixed-frequency notes on a disposable context.
-// `notes` is an array of [frequency, durationSeconds], played back to back.
-function play(notes, type, peak) {
+// Play a sequence of chords on a disposable context. `chords` is a list of
+// [freqs, durationSeconds] where `freqs` is a frequency number or an array of
+// numbers sounding together (a chord) — everything is played back to back.
+function play(chords, type, peak) {
   // typeof guard first: sound.js must be import-safe in non-DOM environments
   // (node tests, jsdom/linkedom without Web Audio).
   if (typeof window === "undefined") return;
@@ -49,22 +53,25 @@ function play(notes, type, peak) {
       if (typeof ctx.resume === "function") ctx.resume().catch?.(() => {});
       const floor = 0.0001; // envelope floor for the exponential decay
       let t = ctx.currentTime;
-      for (const [freq, dur] of notes) {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = type;
-        osc.frequency.value = freq;
-        // Attack in ~10 ms, then decay to near-silence — no clicks, no rings.
-        gain.gain.setValueAtTime(floor, t);
-        gain.gain.linearRampToValueAtTime(peak, t + 0.01);
-        gain.gain.exponentialRampToValueAtTime(floor, t + dur);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(t);
-        osc.stop(t + dur);
+      for (const [freqs, dur] of chords) {
+        const voices = Array.isArray(freqs) ? freqs : [freqs];
+        for (const freq of voices) {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = type;
+          osc.frequency.value = freq;
+          // Attack in ~10 ms, then decay to near-silence — no clicks, no rings.
+          gain.gain.setValueAtTime(floor, t);
+          gain.gain.linearRampToValueAtTime(peak, t + 0.01);
+          gain.gain.exponentialRampToValueAtTime(floor, t + dur);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + dur);
+        }
         t += dur;
       }
-      const total = notes.reduce((s, [, dur]) => s + dur, 0);
+      const total = chords.reduce((s, [, dur]) => s + dur, 0);
       globalThis.setTimeout(() => {
         try {
           if (typeof ctx.close === "function") ctx.close().catch?.(() => {});
@@ -85,18 +92,63 @@ function play(notes, type, peak) {
   }
 }
 
-// Expiry chime: falling two-tone (880 → 660 Hz sine), ~0.35 s total — reads
-// as "time is over" without startling the classroom.
-function timeUp() {
-  if (!enabled()) return;
-  play([[880, 0.15], [660, 0.2]], "sine", 0.25);
-}
-
-// Award blip: rising bright two-note (660 → 990 Hz triangle), ~0.3 s total —
-// a little celebration, still short and classroom-appropriate.
+// Point fanfare: a short bright rising arpeggio (C5–E5–G5) held into a major
+// chord — ~0.7 s of "¡punto!" that reads as a little victory, not a beep.
 function award() {
   if (!enabled()) return;
-  play([[660, 0.12], [990, 0.16]], "triangle", 0.2);
+  play(
+    [[[523], 0.09], [[659], 0.09], [[784], 0.09], [[784, 1047], 0.42]],
+    "triangle",
+    0.22,
+  );
 }
 
-export const sound = { enabled, setEnabled, timeUp, award };
+// Halfway tension beep — the same alarm family as the heartbeat below, fired
+// once when the countdown crosses the 50 % milestone.
+function halfTime() {
+  if (!enabled()) return;
+  play([[[470], 0.14], [[375], 0.22]], "square", 0.16);
+}
+
+// Last-5-seconds heartbeat: the tension beep again, one beat per second,
+// intensifying — the pitch and the punch both rise with `level` (0..4) so the
+// five beats feel like a heart racing.
+function heartbeat(level = 0) {
+  if (!enabled()) return;
+  const step = Math.max(0, Math.min(4, level));
+  play([[[340 + step * 20], 0.14]], "square", 0.1 + step * 0.035);
+}
+
+// Time-over chime: a falling phrase held the full 3 seconds, ending in a
+// sustained two-octave closure ("the program has gone to commercial").
+function timeUp() {
+  if (!enabled()) return;
+  play(
+    [[[660], 0.4], [[523], 0.4], [[440, 220], 0.4], [[349, 175], 1.8]],
+    "sine",
+    0.25,
+  );
+}
+
+// First-place victory fanfare: the long "final lap over you won" tune — a
+// G-G-G arpeggio march into a held C-major spread across two octaves (~3.4 s).
+function victory() {
+  if (!enabled()) return;
+  play(
+    [
+      [[392, 196], 0.14],
+      [[392, 196], 0.14],
+      [[392, 196], 0.14],
+      [[523, 262], 0.3],
+      [[392, 196], 0.3],
+      [[523, 262], 0.14],
+      [[659, 330], 0.14],
+      [[784, 392], 0.7],
+      [[1047, 523], 1.3],
+    ],
+    "triangle",
+    0.22,
+  );
+}
+
+export const sound = { enabled, setEnabled, timeUp, award, halfTime, heartbeat, victory };
