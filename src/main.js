@@ -1,5 +1,8 @@
-import "@fontsource/syne/latin-700.css";
-import "@fontsource/syne/latin-800.css";
+import "@fontsource/montserrat/latin-700.css";
+import "@fontsource/montserrat/latin-800.css";
+import "@fontsource/noto-sans/latin-400.css";
+import "@fontsource/noto-sans/latin-700.css";
+import "@fontsource/bebas-neue/latin-400.css";
 import "@fontsource/dm-sans/latin-400.css";
 import "@fontsource/dm-sans/latin-500.css";
 import "@fontsource/dm-sans/latin-700.css";

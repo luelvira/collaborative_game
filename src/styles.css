@@ -13,10 +13,19 @@
      danger/primary button fills (spec: flat color, no gradients/glows). */
   --color-danger-ink: #2a020c;
   --color-primary-ink: #0a0a0f;
+  /* Timer tones (off-wheel palette): the countdown must not borrow team
+     colors, so it uses a deeper amber/crimson pair with its own inks —
+     dark ink on warn (5.79:1), white on danger (6.22:1), both AA. */
+  --color-timer-warn: #d97706;
+  --color-timer-warn-ink: #1c1208;
+  --color-timer-danger: #c1121f;
+  --color-timer-danger-ink: #ffffff;
   /* Flat green for the answered strip state and award confetti (Task 3). */
   --color-success: #5df06a;
-  --font-display: "Syne", system-ui, sans-serif;
+  --font-display: "Montserrat", system-ui, sans-serif;
   --font-body: "DM Sans", system-ui, sans-serif;
+  --font-question: "Noto Sans", system-ui, sans-serif;
+  --font-timer: "Bebas Neue", system-ui, sans-serif;
   --radius-board: 16px;
 }
 
@@ -718,6 +727,7 @@
 #q-input {
   flex: 1;
   min-width: 0;
+  font-family: var(--font-question);
   font-size: 1.4rem;
   padding: 0.7rem 1rem;
 }
@@ -737,7 +747,7 @@
 
 #q-text {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-question);
   font-size: clamp(2rem, 4.5vw, 3.4rem);
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -753,9 +763,13 @@
 }
 
 #q-timer {
-  font-family: var(--font-display);
-  font-size: 3.2rem;
-  font-weight: 800;
+  font-family: var(--font-timer);
+  /* Bebas ships a single 400 weight (800 would synthesize a faux bold) and
+     runs small/condensed: +16% size keeps the countdown's TV presence, and
+     the letter-spacing stops the digits from touching. */
+  font-size: 3.7rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
   line-height: 1;
   min-width: 2ch;
   text-align: right;
@@ -796,21 +810,21 @@
 }
 
 #q-timer.q-warn {
-  background: #ffb35c;
-  color: var(--color-primary-ink);
+  background: var(--color-timer-warn);
+  color: var(--color-timer-warn-ink);
 }
 
 #q-bar.q-warn {
-  background: #ffb35c;
+  background: var(--color-timer-warn);
 }
 
 #q-timer.q-danger {
-  background: var(--color-danger);
-  color: var(--color-danger-ink);
+  background: var(--color-timer-danger);
+  color: var(--color-timer-danger-ink);
 }
 
 #q-bar.q-danger {
-  background: var(--color-danger);
+  background: var(--color-timer-danger);
 }
 
 @keyframes q-pulse {
@@ -842,7 +856,7 @@
 
 #q-result {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-question);
   font-size: clamp(1.9rem, 4vw, 3rem);
   font-weight: 800;
   letter-spacing: -0.02em;
