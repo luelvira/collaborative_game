@@ -999,6 +999,29 @@ function boot() {
 
   // Expose for tests
   window.__contestApi = api;
+
+  // Manual state patching from the dev console (README documents it): a
+  // safety valve for the teacher — fix a typo or a member list mid-contest
+  // without losing points. get returns the serialized live state; set
+  // accepts a serialized state or a plain object, re-hydrates, persists and
+  // re-renders the view matching the new phase.
+  window.__contestState = {
+    get: () => (state ? api.serialize(state) : null),
+    set: (next) => {
+      const json = typeof next === "string" ? next : JSON.stringify(next);
+      state = api.deserialize(json);
+      persist();
+      if (state.phase === "playing" || state.phase === "frozen") {
+        showView("#view-play");
+        renderBoard();
+        renderWinner();
+      } else {
+        showView("#view-setup");
+        renderSetup();
+      }
+      return api.serialize(state);
+    },
+  };
 }
 
 boot();

@@ -475,3 +475,60 @@ it("countdownTone walks flat → warn → danger with danger winning the ≤5s r
     cleanup();
   }
 });
+
+// === Dev-console state patching (README): the teacher's safety valve ===
+it("__contestState.get reads the live state and set patches members in setup", async () => {
+  const { document, window, cleanup } = bootWithSeededState(() => newState());
+  try {
+    await appModule(); // runs boot(): fills window.__contestState
+    const dbg = window.__contestState;
+    // A fresh boot stays on home until a session is opened: nothing live yet.
+    expect(dbg.get()).toBe(null);
+    document
+      .querySelector("#continue-session")
+      .dispatchEvent(new window.Event("click", { bubbles: true }));
+
+    const st = JSON.parse(dbg.get());
+    expect(st.groups.length).toBe(2);
+    st.groups[0].members = ["ana", "nuevo"];
+    const out = dbg.set(st);
+    // echoed serialized state, persisted, and re-rendered in the editor
+    expect(JSON.parse(out).groups[0].members).toEqual(["ana", "nuevo"]);
+    expect(
+      JSON.parse(window.localStorage.getItem("contestBoard:current"))
+        .groups[0].members,
+    ).toEqual(["ana", "nuevo"]);
+    expect(
+      document.querySelector("#setup-groups .setup-members-list").textContent,
+    ).toContain("nuevo");
+  } finally {
+    cleanup();
+  }
+});
+
+it("__contestState.set re-renders the play board keeping points and colors", async () => {
+  const { document, window, cleanup } = bootWithSeededState(
+    seedThreeGroupsSevenUsers,
+  );
+  try {
+    await appModule(); // runs boot(): fills window.__contestState
+    document
+      .querySelector("#continue-session")
+      .dispatchEvent(new window.Event("click", { bubbles: true }));
+    const dbg = window.__contestState;
+    const st = JSON.parse(dbg.get());
+    st.groups[1].members = ["carl", "nuevo"];
+    dbg.set(st);
+
+    const cards = document.querySelectorAll("#board .card");
+    expect(cards.length).toBe(3);
+    // scores survive the hand patch
+    expect(cards[0].querySelector(".score").textContent).toBe("3");
+    expect(cards[1].querySelector(".score").textContent).toBe("1");
+    expect(
+      [...cards[1].querySelectorAll(".members li span")].map((s) => s.textContent),
+    ).toEqual(["carl", "nuevo"]);
+  } finally {
+    cleanup();
+  }
+});

@@ -62,6 +62,37 @@ Todo el estado del concurso se autoguarda en `localStorage` tras cada cambio
 sobrevive a refrescos: refrescar en mitad de una pregunta conserva la
 pregunta; el tiempo restante no, la cuenta atrás vuelve a su valor inicial.
 
+## Editar a mano los miembros de cada grupo (consola)
+
+Si alguna vez necesitas tocar a mano los miembros de un grupo (dar de alta o
+baja a alguien, corregir un nombre duplicado… cuando la edición en pantalla
+ya no alcanza), la app expone un gancho para la **consola de desarrollo** del
+navegador (F12 → pestaña *Consola*):
+
+```js
+// 1) Leemos el estado vivo del concurso (string JSON serializado)
+const st = JSON.parse(__contestState.get());
+
+// 2) Editamos a mano los miembros. El índice es el de la interfaz:
+//    groups[0] es la primera tarjeta (izquierda → derecha, arriba → abajo).
+st.groups[0].members = ["Ana", "Bruno", "Carla"];
+st.groups[1].members = st.groups[1].members.filter((n) => n !== "Dana");
+
+// 3) Aplicamos: el estado se rehidrata, autoguarda y la vista se redibuja
+__contestState.set(st);
+```
+
+Notas:
+
+- `set` admite el objeto tal cual o el string JSON de vuelta
+  (`__contestState.set(JSON.stringify(st))`).
+- Todo lo que no toques (puntos, pregunta en curso, colores…) se conserva;
+  los puntos nunca se pierden.
+- Los cambios quedan autoguardados en `contestBoard:current`, igual que las
+  ediciones hechas en la interfaz.
+- Es un mecanismo de emergencia para el profesor: no validaciones, el
+  formato lo pones tú (`members` es una lista simple de nombres).
+
 ## Ejecutar en local
 
 ```bash
