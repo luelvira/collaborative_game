@@ -74,11 +74,45 @@ function onRoundTick() {
   paintQTimer(remaining, total);
 }
 
+// Pure seam for the countdown tones: "flat" keeps the plain white pill/fill,
+// "warn" (≤ 50 % of the total) goes orange and "danger" (≤ 5000 ms) goes red.
+// The ≤ 5 s rule is checked FIRST so a 5 s question starts directly in danger
+// and a value that satisfies both thresholds keeps the red tone.
+export function countdownTone(remainingMs, totalMs) {
+  if (remainingMs <= 5000) return "danger";
+  if (remainingMs <= totalMs / 2) return "warn";
+  return "flat";
+}
+
+// Class map for a tone, applied idempotently: compute the wanted set and
+// toggle each of the three classes to present/absent, so either tone change
+// sweeps stale classes and repeated 200 ms ticks restart nothing. Colors
+// live in CSS (`q-warn` orange, `q-danger` red); `q-pulse` is the danger-only
+// 1 s zoom breathing. The pulse goes on both offered elements (#q-timer and
+// the bar container .q-bar) — transforms never trigger layout shifts, so the
+// strip's neighbours cannot jump.
+function applyQTimerTone(tone) {
+  const timer = $("#q-timer");
+  const fill = $("#q-bar");
+  const barWrap = fill ? fill.parentElement : null;
+  const wants = tone === "warn" ? ["q-warn"] : tone === "danger" ? ["q-danger", "q-pulse"] : [];
+  const paint = (el) => {
+    if (!el) return;
+    for (const cls of ["q-warn", "q-danger", "q-pulse"]) {
+      el.classList.toggle(cls, wants.includes(cls));
+    }
+  };
+  paint(timer);
+  paint(fill);
+  paint(barWrap);
+}
+
 function paintQTimer(remaining, total) {
   const timer = $("#q-timer");
   const bar = $("#q-bar");
   if (timer) timer.textContent = String(Math.ceil(remaining / 1000));
   if (bar) bar.style.width = `${Math.max(0, Math.min(1, remaining / total)) * 100}%`;
+  applyQTimerTone(countdownTone(remaining, total));
 }
 
 // Message of the after-view: the most recent award on the undo log wins; an

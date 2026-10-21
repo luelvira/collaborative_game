@@ -677,6 +677,13 @@
   .confetti {
     display: none !important;
   }
+
+  /* Countdown tones are information, not decoration: under reduce the colors
+     stay and only the 1 s zoom breathing is disabled. */
+  .q-pulse,
+  #q-timer.q-pulse {
+    animation: none !important;
+  }
 }
 
 /* ===== Task 3: franja de pregunta (ad-hoc question strip) =====
@@ -769,6 +776,60 @@
   width: 100%;
   background: var(--color-text);
   border-radius: 999px;
+}
+
+/* ===== Animated countdown tones =====
+   Thresholds from the validated design: ≤ 50 % of the round → orange (warn),
+   ≤ 5 s → red (danger) plus a 1 s zoom breathing on both the pill and the
+   bar. Flat dark theme rules hold: solid fills only, no gradients/shadows.
+   Padding + radius live on #q-timer permanently so the first colored tick
+   does not reflow the pill's neighbours. */
+
+#q-timer {
+  padding: 0 0.35rem;
+  border-radius: 999px;
+}
+
+#q-timer,
+#q-bar {
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+#q-timer.q-warn {
+  background: #ffb35c;
+  color: var(--color-primary-ink);
+}
+
+#q-bar.q-warn {
+  background: #ffb35c;
+}
+
+#q-timer.q-danger {
+  background: var(--color-danger);
+  color: var(--color-danger-ink);
+}
+
+#q-bar.q-danger {
+  background: var(--color-danger);
+}
+
+@keyframes q-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+/* Danger-only breathing, exactly the user's "intervalo de un segundo".
+   Transform never affects layout, so the strip's neighbours cannot jump.
+   The pulse lives on the pill and the bar container (.q-bar); the fill
+   inside it breathes along. */
+#q-timer.q-pulse,
+.q-bar.q-pulse {
+  animation: q-pulse 1s ease-in-out infinite;
 }
 
 #q-after {

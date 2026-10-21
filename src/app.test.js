@@ -383,3 +383,30 @@ it("celebrate() under prefers-reduced-motion removes flash/celebrating synchrono
     cleanup();
   }
 });
+
+// === Countdown tones (animated countdown brief): pure seam threshold order
+it("countdownTone walks flat → warn → danger with danger winning the ≤5s rule", async () => {
+  // Pure helper, but app.js boots against a DOM: reuse the harness, then
+  // exercise the exported function with no UI side effects.
+  const { cleanup } = bootWithSeededState(() => newState());
+  try {
+    const { countdownTone } = await appModule();
+    expect(countdownTone(29999, 30000)).toBe("flat");
+    // Exactly 50 % remaining → warn (edge is inclusive).
+    expect(countdownTone(15000, 30000)).toBe("warn");
+    // Exactly 5000 ms → danger, even for a full-length round.
+    expect(countdownTone(5000, 30000)).toBe("danger");
+    expect(countdownTone(1000, 10000)).toBe("danger");
+    expect(countdownTone(4999, 30000)).toBe("danger");
+    // A 5 s question starts directly in danger (≤ 5 s beats the 50 % rule).
+    expect(countdownTone(2000, 5000)).toBe("danger");
+    // Warn-window edges (30 s round): the brief's example (2501, 10000) →
+    // "warn" conflicts with its own rule ordering (≤ 5000 ms is danger, so a
+    // 10 s round has no warn window at all). Pinned here: the first ms above
+    // the danger rule is still warn, and the first ms above 50 % is flat.
+    expect(countdownTone(5001, 30000)).toBe("warn");
+    expect(countdownTone(15001, 30000)).toBe("flat");
+  } finally {
+    cleanup();
+  }
+});

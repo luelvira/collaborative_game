@@ -245,6 +245,18 @@ test.describe("franja de pregunta en la vista de juego", () => {
     await expect(page.locator("#q-timer")).toHaveText(/^(30|29)$/);
   });
 
+  test("tonos de cuenta atras: 5 s arranca ya en rojo y pulsa", async ({ page }) => {
+    await setupContest(page, 2, ["ana"]);
+    // A 5 s question is born inside the danger window: no need to wait for
+    // the mid-round warn tone.
+    await launchQuestion(page, "¿Color primario del Shanghai Skyline?", 5);
+    await expect(page.locator("#q-timer")).toHaveClass(/q-danger/);
+    await expect(page.locator("#q-timer")).toHaveClass(/q-pulse/);
+    await expect(page.locator("#q-bar")).toHaveClass(/q-danger/);
+    // The container breathes with the pill.
+    await expect(page.locator(".q-bar")).toHaveClass(/q-pulse/);
+  });
+
   test("expiracion: franja roja, deshacer inerte y puntuar a mano celebra", async ({ page }) => {
     await setupContest(page, 2, ["ana"]);
     await launchQuestion(page, "¿Capital de Mongolia?", 5);
