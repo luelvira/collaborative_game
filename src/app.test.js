@@ -1,0 +1,534 @@
+import { it, expect, vi } from 'vitest'
+import { parseHTML } from "linkedom";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+import {
+  newState,
+  setGroupCount,
+  addGroup,
+  addMember,
+  addPoints,
+  startContest,
+  endContest,
+  serialize,
+  setQuestion,
+  startRound,
+  expireRound,
+  awardPoints,
+  undoLastAward,
+} from "./lib.js";
+
+function bootWithSeededState(seedBuilder) {
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  const htmlPath = resolve(__dirname, "../index.html");
+  const html = readFileSync(htmlPath, "utf8").replace(
+    /<script type="module" src="[^"]+"><\/script>/,
+    "",
+  );
+  const { window, document } = parseHTML(html);
+  const store = new Map();
+  Object.defineProperty(window, 'localStorage', {
+    value: {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, String(v)),
+    },
+    writable: true,
+    configurable: true,
+  });
+  const saved = { ...window };
+  const priorDocument = globalThis.document;
+  for (const [k, v] of Object.entries(saved)) {
+    if (!(k in globalThis)) globalThis[k] = v;
+  }
+  Object.defineProperty(globalThis, "document", {
+    value: document,
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(globalThis, "window", {
+    value: window,
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(globalThis, "localStorage", {
+    value: window.localStorage,
+    writable: true,
+    configurable: true,
+  });
+  const state = seedBuilder();
+  window.localStorage.setItem("contestBoard:current", serialize(state));
+  return {
+    window,
+    document,
+    store,
+    cleanup: () => {
+      globalThis.document = priorDocument;
+    },
+  };
+}
+
+function seedThreeGroupsSevenUsers() {
+  const s = newState();
+  setGroupCount(s, 3, () => 0.5);
+  for (const n of ["ana", "brie", "carl", "dana", "evan", "fay", "gus"]) {
+    addMember(s, s.groups[0].id, n, () => 0);
+    addMember(s, s.groups[0].id, n, () => 0);
+    addMember(s, s.groups[0].id, n, () => 0);
+    addMember(s, s.groups[0].id, n, () => 0);
+    addMember(s, s.groups[0].id, n, () => 0);
+    addMember(s, s.groups[0].id, n, () => 0);
+    addMember(s, s.groups[0].id, n, () => 0);
+  }
+  // easier: just add directly by distributing
+  s.groups[0].members = ["ana", "brie"];
+  s.groups[1].members = ["carl", "dana"];
+  s.groups[2].members = ["evan", "fay", "gus"];
+  s.groups[0].name = "Alpha";
+  s.groups[1].name = "Bravo";
+  s.groups[2].name = "Charlie";
+  startContest(s);
+  addPoints(s, s.groups[0].id, 3);
+  addPoints(s, s.groups[1].id, 1);
+  addPoints(s, s.groups[2].id, 3);
+  return s;
+}
+
+function frozenSeed() {
+  const s = seedThreeGroupsSevenUsers();
+  endContest(s);
+  return s;
+}
+
+const appModule = async () => {
+  vi.resetModules();
+  return import("./app.js");
+};
+
+it("adding groups without typing names gives them their color names", async () => {
+  const { document, window, store, cleanup } = bootWithSeededState(() => newState());
+  try {
+    const { api } = await appModule();
+    document.querySelector("#fresh-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    const gc = document.querySelector("#group-count");
+    gc.value = "2";
+    gc.dispatchEvent(new window.Event("change", { bubbles: true }));
+    const saved = JSON.parse(store.get("contestBoard:current"));
+    const expected = [0, 1].map((i) => api.colorName(api.colorHue(saved.startHue, 2, i)));
+    const names = [...document.querySelectorAll("#setup-groups input.setup-group-name")].map((n) => n.value);
+    expect(names.sort()).toEqual(expected.sort());
+    expect(api).toBeDefined();
+  } finally {
+    cleanup();
+  }
+});
+
+it("fresh setup shows two groups immediately", async () => {
+  const { document, window, cleanup } = bootWithSeededState(() => newState());
+  try {
+    await appModule();
+    document.querySelector("#fresh-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    const names = [...document.querySelectorAll("#setup-groups input.setup-group-name")].map((n) => n.value);
+    expect(names.length).toBe(2);
+    expect(names[0].length).toBeGreaterThan(0);
+    expect(names[1].length).toBeGreaterThan(0);
+    expect(document.querySelector("#group-count").value).toBe("2");
+  } finally {
+    cleanup();
+  }
+});
+
+it("a fresh untouched session is not saved until the user edits something", async () => {
+  const { document, window, store, cleanup } = bootWithSeededState(() => newState());
+  try {
+    await appModule();
+    // Emulate a first visit: drop whatever is saved so nothing exists yet.
+    store.delete("contestBoard:current");
+    document.querySelector("#fresh-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    expect(store.get("contestBoard:current")).toBeFalsy();
+    // renaming is an edit -> persists
+    const nameInput = document.querySelector("#setup-groups input.setup-group-name");
+    nameInput.value = "Team A";
+    nameInput.dispatchEvent(new window.Event("change", { bubbles: true }));
+    const saved = JSON.parse(store.get("contestBoard:current"));
+    expect(saved.groups.some((g) => g.name === "Team A")).toBe(true);
+  } finally {
+    cleanup();
+  }
+});
+
+it("adding a named group (via seeded state) still renders its name", async () => {
+  const { document, window, cleanup } = bootWithSeededState(seedThreeGroupsSevenUsers);
+  try {
+    await appModule();
+    document.querySelector("#continue-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    const names = [...document.querySelectorAll("#board .card .card-head h2")].map((n) => n.textContent);
+    expect(names.sort()).toEqual(["Alpha", "Bravo", "Charlie"].sort());
+  } finally {
+    cleanup();
+  }
+});
+
+it("end contest freezes the board and shows tied winners", async () => {
+  const { document, window, store, cleanup } = bootWithSeededState(seedThreeGroupsSevenUsers);
+  try {
+    await appModule();
+    document.querySelector("#continue-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    document.querySelector("#end-contest").dispatchEvent(new window.Event("click", { bubbles: true }));
+    expect(document.querySelector("#winner").hidden).toBe(false);
+    expect(document.querySelector("#winner-name").textContent).toMatch(/Alpha|Charlie/);
+    const persisted = JSON.parse(store.get("contestBoard:current"));
+    expect(persisted.phase).toBe("frozen");
+  } finally {
+    cleanup();
+  }
+});
+
+it("reset archives the play with start timestamp and restarts", async () => {
+  const { document, window, store, cleanup } = bootWithSeededState(seedThreeGroupsSevenUsers);
+  try {
+    await appModule();
+    document.querySelector("#continue-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    document.querySelector("#end-contest").dispatchEvent(new window.Event("click", { bubbles: true }));
+    const realConfirm = window.confirm;
+    window.confirm = () => true;
+    document.querySelector("#reset").dispatchEvent(new window.Event("click", { bubbles: true }));
+    window.confirm = realConfirm;
+    const runs = JSON.parse(store.get("contestBoard:history"));
+    expect(runs.length).toBe(1);
+    expect(runs[0].startedAt > 0 && runs[0].endedAt >= runs[0].startedAt).toBe(true);
+    expect([1, 2].includes(runs[0].winners.length)).toBe(true);
+    const fresh = JSON.parse(store.get("contestBoard:current"));
+    expect(fresh.phase).toBe("setup");
+    expect(fresh.groups.length).toBe(2);
+    expect(fresh.startedAt > runs[0].startedAt).toBe(true);
+    expect(document.querySelector("#winner").hidden).toBe(true);
+    expect(document.querySelector("#history").hidden).toBe(false);
+    // Spanish copy: history heading + "Ganador: {names}" (tie between the 3-pointers)
+    const historyText = document.querySelector("#history").textContent;
+    expect(historyText).toContain("Partidas anteriores");
+    expect(historyText).toMatch(/Ganador: (Alpha & Charlie|Charlie & Alpha)/);
+  } finally {
+    cleanup();
+  }
+});
+
+it("loading a frozen state after refresh restores the winner view", async () => {
+  const { document, window, cleanup } = bootWithSeededState(frozenSeed);
+  try {
+    await appModule();
+    document.querySelector("#continue-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    expect(document.querySelector("#winner").hidden).toBe(false);
+  } finally {
+    cleanup();
+  }
+});
+
+it("boot renders one card per stored group with score and team top border", async () => {
+  const { document, window, cleanup } = bootWithSeededState(seedThreeGroupsSevenUsers);
+  try {
+    await appModule();
+    document.querySelector("#continue-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    const cards = document.querySelectorAll("#board .card");
+    expect(cards.length).toBe(3);
+    const scores = [...cards].map((c) => c.querySelector(".score").textContent);
+    const total = scores.reduce((acc, s) => acc + Number(s), 0);
+    expect(total).toBe(7);
+    // team identity: thick flat top border + the CSS var used by award flash
+    [...cards].forEach((c) => {
+      expect(c.style.borderTop).toMatch(/^10px solid hsl\(\d+, 90%, 60%\)$/);
+      expect(c.style.getPropertyValue("--team-color")).toMatch(/^hsl\(\d+, 90%, 60%\)$/);
+    });
+  } finally {
+    cleanup();
+  }
+});
+
+it("a handler that throws shows the error as a visible toast, not a dead button", async () => {
+  const { document, window, cleanup } = bootWithSeededState(() => newState());
+  try {
+    const { api } = await appModule();
+    document.querySelector("#fresh-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    const gc = document.querySelector("#group-count");
+    gc.value = "2";
+    gc.dispatchEvent(new window.Event("change", { bubbles: true }));
+    api.addMember = () => {
+      throw new TypeError("boom");
+    };
+    const user = document.querySelector("#user-name");
+    user.value = "zed";
+    document.querySelector("#add-user").dispatchEvent(new window.Event("click", { bubbles: true }));
+    const toast = document.querySelector("#toast.show");
+    expect(toast).not.toBe(null);
+    // Spanish crash prefix: "{label}: {message}" with the Spanish label
+    expect(toast.textContent).toBe("Añadir jugador: boom");
+  } finally {
+    cleanup();
+  }
+});
+
+it("clicking +1 updates the score and persists", async () => {
+  const { document, window, store, cleanup } = bootWithSeededState(seedThreeGroupsSevenUsers);
+  try {
+    await appModule();
+    document.querySelector("#continue-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    const firstCard = document.querySelector("#board .card");
+    const scoreNode = firstCard.querySelector(".score");
+    const before = Number(scoreNode.textContent);
+    firstCard
+      .querySelector('.points-row [data-action="award"]')
+      .dispatchEvent(new window.Event("click", { bubbles: true }));
+    const freshScore = document.querySelector("#board .card .score");
+    expect(Number(freshScore.textContent)).toBe(before + 1);
+    const restored = JSON.parse(store.get("contestBoard:current"));
+    const scored = restored.groups.map((g) => g.points);
+    expect(scored.reduce((a, b) => a + b, 0)).toBe(7 + 1);
+  } finally {
+    cleanup();
+  }
+});
+
+it("the final screen shows a top-3 podium and the rest ranked with scores", async () => {
+  const { document, window, cleanup } = bootWithSeededState(frozenSeed);
+  try {
+    await appModule();
+    document.querySelector("#continue-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    expect(document.querySelector("#winner").hidden).toBe(false);
+    // Podium: three steps, each with place badge, name and score visible.
+    const steps = [...document.querySelectorAll("#podium-steps .step")];
+    expect(steps.map((s) => s.dataset.place)).toEqual(["2", "1", "3"]);
+    expect(steps.map((s) => s.querySelector(".step-place").textContent)).toEqual(["2º", "1º", "3º"]);
+    expect(steps.map((s) => s.querySelector(".step-score").textContent)).toEqual(["3", "3", "1"]);
+    for (const s of steps) {
+      expect(s.querySelector(".step-name").textContent.length).toBeGreaterThan(0);
+    }
+
+    // Ranking: the rest of teams sorted desc with their scores — here every
+    // team is inside the podium, so the list is empty.
+    expect(document.querySelectorAll("#ranking li").length).toBe(0);
+  } finally {
+    cleanup();
+  }
+});
+
+it("groups outside the podium land in the ranked list with scores", async () => {
+  const { document, window, cleanup } = bootWithSeededState(() => {
+    const s = newState(() => 0.5);
+    setGroupCount(s, 5, () => 0.5);
+    s.groups.forEach((g, i) => {
+      s.groups[i].members = [`p${i}`];
+    });
+    startContest(s);
+    [4, 3, 2, 1, 0].forEach((points, i) => {
+      addPoints(s, s.groups[i].id, points);
+    });
+    endContest(s);
+    return s;
+  });
+  try {
+    await appModule();
+    document.querySelector("#continue-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    expect(document.querySelector("#winner").hidden).toBe(false);
+    expect(document.querySelectorAll("#podium-steps .step").length).toBe(3);
+    // Ranked list: groups 4º/5º with visible scores, descending order.
+    const rows = [...document.querySelectorAll("#ranking li")];
+    expect(rows.length).toBe(2);
+    expect(rows[0].querySelector(".rank").textContent).toBe("4º");
+    expect(rows[0].querySelector(".rank-score").textContent).toBe("1 punto");
+    expect(rows[1].querySelector(".rank").textContent).toBe("5º");
+    expect(rows[1].querySelector(".rank-score").textContent).toBe("0 puntos");
+  } finally {
+    cleanup();
+  }
+});
+
+it("runner-up uses color names when groups have no explicit name", async () => {
+  const { document, window, cleanup } = bootWithSeededState(() => {
+    // newState(() => 0.5) seeds two groups on hue 180: "cian" and "rojo".
+    const s = newState(() => 0.5);
+    addMember(s, s.groups[0].id, "alice", () => 0);
+    addMember(s, s.groups[1].id, "bob", () => 0.5);
+    startContest(s);
+    addPoints(s, s.groups[0].id, 5);
+    addPoints(s, s.groups[1].id, 2);
+    return s;
+  });
+  try {
+    await appModule();
+    document.querySelector("#continue-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    document.querySelector("#end-contest").dispatchEvent(new window.Event("click", { bubbles: true }));
+    // With two groups the podium shows "2º | 1º" and the winner headline keeps
+    // the auto color names (raw names may be null; display names derive).
+    const places = [...document.querySelectorAll("#podium-steps .step")].map(
+      (s) => s.querySelector(".step-place").textContent,
+    );
+    expect(places).toEqual(["2º", "1º"]);
+    const names = [...document.querySelectorAll("#podium-steps .step-name")].map(
+      (n) => n.textContent,
+    );
+    expect(names).toContain("cian eléctrico");
+    expect(names).toContain("rojo coral");
+    expect(document.querySelector("#winner-name").textContent).toBe("cian eléctrico");
+  } finally {
+    cleanup();
+  }
+});
+
+// Final-review Finding 1: the expired-round source message must survive the
+// refresh that killed the old module variable. Expired → awarded → undo-all →
+// (refresh → continue) leaves phase "answered" with no awards, yet the spec
+// demands the red "⏱ ¡Tiempo!" strip — message AND expired accent.
+it("an expired round awarded and fully undone returns to the red ⏱ ¡Tiempo! strip after a refresh", async () => {
+  const { document, window, cleanup } = bootWithSeededState(() => {
+    const s = newState(() => 0.5);
+    addMember(s, s.groups[0].id, "alice", () => 0);
+    startContest(s);
+    setQuestion(s, "¿5×5?");
+    startRound(s);
+    expireRound(s);
+    awardPoints(s, s.groups[0].id, 1);
+    undoLastAward(s);
+    return s;
+  });
+  try {
+    await appModule();
+    // continue-session is what a refresh lands on (hydrated from storage).
+    document.querySelector("#continue-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    expect(document.querySelector("#q-after").hidden).toBe(false);
+    expect(document.querySelector("#q-result").textContent).toBe("⏱ ¡Tiempo!");
+    expect(document.querySelector("#q-strip").dataset.e).toBe("expired");
+  } finally {
+    cleanup();
+  }
+});
+
+// Final-review Finding 3: plan promised a reduced-motion guard test for the
+// award celebration. celebrate() is read through the same DOM helper the rest
+// of this file uses; the classList wrappers record every add/remove so the
+// synchronous add→remove (nothing animates) is actually observable.
+it("celebrate() under prefers-reduced-motion removes flash/celebrating synchronously with zero confetti", async () => {
+  const { document, window, cleanup } = bootWithSeededState(seedThreeGroupsSevenUsers);
+  try {
+    const { celebrate } = await appModule();
+    document.querySelector("#continue-session").dispatchEvent(new window.Event("click", { bubbles: true }));
+    window.matchMedia = (query) => ({
+      matches: query === "(prefers-reduced-motion: reduce)",
+    });
+    const card = document.querySelector("#board .card");
+    const board = document.querySelector("#board");
+    const log = [];
+    const record = (el) => {
+      const real = el.classList;
+      Object.defineProperty(el, "classList", {
+        configurable: true,
+        value: {
+          add: (...names) => {
+            log.push(names);
+            real.add(...names);
+          },
+          remove: (...names) => {
+            log.push(names);
+            real.remove(...names);
+          },
+          contains: (name) => real.contains(name),
+          toggle: name => real.toggle(name),
+        },
+      });
+    };
+    record(card);
+    record(board);
+    celebrate(card);
+    // Añadido y retirada síncronos: flash y celebrating entran y salen en el
+    // mismo tick, sin confeti ni timeout de limpieza.
+    expect(log).toEqual([["flash"], ["celebrating"], ["flash"], ["celebrating"]]);
+    expect(card.classList.contains("flash")).toBe(false);
+    expect(board.classList.contains("celebrating")).toBe(false);
+    expect(card.querySelectorAll(".confetti").length).toBe(0);
+  } finally {
+    cleanup();
+  }
+});
+
+// === Countdown tones (animated countdown brief): pure seam threshold order
+it("countdownTone walks flat → warn → danger with danger winning the ≤5s rule", async () => {
+  // Pure helper, but app.js boots against a DOM: reuse the harness, then
+  // exercise the exported function with no UI side effects.
+  const { cleanup } = bootWithSeededState(() => newState());
+  try {
+    const { countdownTone } = await appModule();
+    expect(countdownTone(29999, 30000)).toBe("flat");
+    // Exactly 50 % remaining → warn (edge is inclusive).
+    expect(countdownTone(15000, 30000)).toBe("warn");
+    // Exactly 5000 ms → danger, even for a full-length round.
+    expect(countdownTone(5000, 30000)).toBe("danger");
+    expect(countdownTone(1000, 10000)).toBe("danger");
+    expect(countdownTone(4999, 30000)).toBe("danger");
+    // A 5 s question starts directly in danger (≤ 5 s beats the 50 % rule).
+    expect(countdownTone(2000, 5000)).toBe("danger");
+    // Warn-window edges (30 s round): the brief's example (2501, 10000) →
+    // "warn" conflicts with its own rule ordering (≤ 5000 ms is danger, so a
+    // 10 s round has no warn window at all). Pinned here: the first ms above
+    // the danger rule is still warn, and the first ms above 50 % is flat.
+    expect(countdownTone(5001, 30000)).toBe("warn");
+    expect(countdownTone(15001, 30000)).toBe("flat");
+  } finally {
+    cleanup();
+  }
+});
+
+// === Dev-console state patching (README): the teacher's safety valve ===
+it("__contestState.get reads the live state and set patches members in setup", async () => {
+  const { document, window, cleanup } = bootWithSeededState(() => newState());
+  try {
+    await appModule(); // runs boot(): fills window.__contestState
+    const dbg = window.__contestState;
+    // A fresh boot stays on home until a session is opened: nothing live yet.
+    expect(dbg.get()).toBe(null);
+    document
+      .querySelector("#continue-session")
+      .dispatchEvent(new window.Event("click", { bubbles: true }));
+
+    const st = JSON.parse(dbg.get());
+    expect(st.groups.length).toBe(2);
+    st.groups[0].members = ["ana", "nuevo"];
+    const out = dbg.set(st);
+    // echoed serialized state, persisted, and re-rendered in the editor
+    expect(JSON.parse(out).groups[0].members).toEqual(["ana", "nuevo"]);
+    expect(
+      JSON.parse(window.localStorage.getItem("contestBoard:current"))
+        .groups[0].members,
+    ).toEqual(["ana", "nuevo"]);
+    expect(
+      document.querySelector("#setup-groups .setup-members-list").textContent,
+    ).toContain("nuevo");
+  } finally {
+    cleanup();
+  }
+});
+
+it("__contestState.set re-renders the play board keeping points and colors", async () => {
+  const { document, window, cleanup } = bootWithSeededState(
+    seedThreeGroupsSevenUsers,
+  );
+  try {
+    await appModule(); // runs boot(): fills window.__contestState
+    document
+      .querySelector("#continue-session")
+      .dispatchEvent(new window.Event("click", { bubbles: true }));
+    const dbg = window.__contestState;
+    const st = JSON.parse(dbg.get());
+    st.groups[1].members = ["carl", "nuevo"];
+    dbg.set(st);
+
+    const cards = document.querySelectorAll("#board .card");
+    expect(cards.length).toBe(3);
+    // scores survive the hand patch
+    expect(cards[0].querySelector(".score").textContent).toBe("3");
+    expect(cards[1].querySelector(".score").textContent).toBe("1");
+    expect(
+      [...cards[1].querySelectorAll(".members li span")].map((s) => s.textContent),
+    ).toEqual(["carl", "nuevo"]);
+  } finally {
+    cleanup();
+  }
+});

@@ -1,0 +1,1073 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0a0a0f;
+  --color-surface: #121218;
+  --color-surface-2: #15151d;
+  --color-line: #2c2c3a;
+  --color-text: #ffffff;
+  --color-text-dim: #cfd2dc;
+  --color-accent: #22d3ee;
+  --color-danger: #ff5c7c;
+  /* Ink-on-color pairs: dark ink guarantees AA contrast on the solid
+     danger/primary button fills (spec: flat color, no gradients/glows). */
+  --color-danger-ink: #2a020c;
+  --color-primary-ink: #0a0a0f;
+  /* Timer tones (off-wheel palette): the countdown must not borrow team
+     colors, so it uses a deeper amber/crimson pair with its own inks —
+     dark ink on warn (5.79:1), white on danger (6.22:1), both AA. */
+  --color-timer-warn: #d97706;
+  --color-timer-warn-ink: #1c1208;
+  --color-timer-danger: #c1121f;
+  --color-timer-danger-ink: #ffffff;
+  /* Flat green for the answered strip state and award confetti (Task 3). */
+  --color-success: #5df06a;
+  --font-display: "Montserrat", system-ui, sans-serif;
+  --font-body: "DM Sans", system-ui, sans-serif;
+  --font-question: "Noto Sans", system-ui, sans-serif;
+  --font-timer: "Bebas Neue", system-ui, sans-serif;
+  --radius-board: 16px;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+
+  /* Plain unambiguous black. The scoreboard is projected on a washed-out
+     classroom TV, so the background carries zero raster work: no gradients,
+     no fixed stripe layer, nothing to re-rasterize on scroll. */
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--color-text);
+    font-family: var(--font-body);
+    background-color: var(--color-ink);
+  }
+
+  button,
+  input {
+    font: inherit;
+    color: var(--color-text);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-line);
+    border-radius: 10px;
+    padding: 0.6rem 0.95rem;
+    outline: none;
+  }
+
+  input:focus {
+    border-color: var(--color-accent);
+  }
+
+  /* Keyboard visibility (WCAG 2.4.7): the board is used with a presenter
+     remote, so keyboard and click must be distinguishable against the flat
+     surfaces. */
+  button:focus-visible,
+  input:focus-visible {
+    outline: 3px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  /* Nice-by-default gray placeholders sit under 4.5:1 on the dark surfaces —
+     paint them with the AA-checked dim text color. */
+  input::placeholder {
+    color: var(--color-text-dim);
+    opacity: 1;
+  }
+
+  button {
+    cursor: pointer;
+    transition: transform 0.06s ease, filter 0.15s ease, background 0.15s ease;
+  }
+
+  button:hover:not(:disabled) {
+    filter: brightness(1.12);
+  }
+
+  button:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  button.danger {
+    background: var(--color-danger);
+    border-color: transparent;
+    color: var(--color-danger-ink);
+    font-weight: 700;
+  }
+
+  button.primary {
+    background: var(--color-text);
+    border-color: transparent;
+    color: var(--color-primary-ink);
+    font-weight: 800;
+  }
+
+  button.ghost {
+    background: transparent;
+    border-color: var(--color-line);
+    color: var(--color-text);
+    font-weight: 600;
+  }
+}
+
+@layer components {
+  .view-home {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 2rem;
+  }
+
+  .home-stage {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .home-kicker {
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.28em;
+    color: var(--color-accent);
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+
+  .home-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 8vw, 5rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+  }
+
+  .home-sub {
+    margin: 0;
+    color: var(--color-text-dim);
+    font-size: 1.1rem;
+  }
+
+  .home-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: center;
+    margin-top: 1rem;
+  }
+
+  .home-btn {
+    min-width: 220px;
+    font-size: 1.1rem;
+    padding: 0.75rem 1.4rem;
+  }
+
+  .view-setup {
+    min-height: 100vh;
+  }
+
+  .setup-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 1.75rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .setup-group {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .setup-group-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .setup-swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    flex: none;
+  }
+
+  .setup-group-name {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: 1px solid var(--color-line);
+    font-size: 1.1rem;
+  }
+
+  .setup-members {
+    padding: 0.9rem 1rem 1rem;
+  }
+
+  .setup-members-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    font-size: 1.1rem;
+  }
+
+  .setup-members-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--color-surface-2);
+    border-radius: 8px;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--color-line);
+  }
+
+  .setup-members-list .rm {
+    background: none;
+    border: none;
+    color: var(--color-text-dim);
+    padding: 0 0.25rem;
+  }
+
+  .topbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 2rem;
+    align-items: end;
+    justify-content: space-between;
+    padding: 1.75rem 1.75rem 1.4rem;
+    border-bottom: 1px solid var(--color-line);
+    background: var(--color-surface);
+  }
+
+  .brand {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: min(100%, 16rem);
+  }
+
+  .brand h1 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(2.4rem, 5vw, 3.4rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 0.95;
+  }
+
+  .brand .status {
+    margin: 0;
+    color: var(--color-text-dim);
+    font-size: 1.05rem;
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.85rem;
+    align-items: end;
+  }
+
+  .control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .control label {
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-dim);
+    font-weight: 700;
+  }
+
+  .control-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .board {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 1.75rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .board-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1.25rem;
+    width: 100%;
+  }
+
+  .board-row .card {
+    flex: 1 1 280px;
+    max-width: 420px;
+  }
+
+  .board-row .setup-group {
+    flex: 1 1 280px;
+    max-width: 420px;
+  }
+
+  /* Single-column card: no per-card color chip or glow. Team identity comes
+     from the thick top border, set inline per card (Task 3) via
+     `border-top: 10px solid <teamColor>`; this 1px line is the fallback so
+     the card still reads before that inline style lands. */
+  .card {
+    display: grid;
+    grid-template-columns: 1fr;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-board);
+    overflow: hidden;
+    min-height: 380px;
+    max-height: 520px;
+  }
+
+  .card.card-enter {
+    animation: card-in 0.34s cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+
+  /* Gentle fade+rise when a view is unhidden (home -> setup -> play). */
+  .view {
+    animation: view-in 0.24s cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+
+  .card-body {
+    padding: 1.1rem 1.25rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+
+  .card-head h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 800;
+    text-transform: capitalize;
+    letter-spacing: -0.02em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  .card-head .rm-group {
+    background: none;
+    border: none;
+    color: var(--color-text-dim);
+    padding: 0.15rem 0.35rem;
+  }
+
+  /* The score is the dominant element of the TV card; tabular-nums keeps
+     digit changes from wobbling neighbors. */
+  .score {
+    font-family: var(--font-display);
+    font-size: clamp(3.4rem, 5vw, 4.6rem);
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+  }
+
+  .points-row {
+    display: flex;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+  }
+
+  .points-row button {
+    flex: 1;
+    min-width: 3.2rem;
+    min-height: 2.85rem;
+    padding: 0.55rem 0.35rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  .points-row .plus {
+    color: var(--color-text);
+  }
+
+  .custom-points {
+    display: flex;
+    gap: 0.45rem;
+  }
+
+  .custom-points input {
+    flex: 1;
+    min-width: 0;
+    font-size: 1.1rem;
+  }
+
+  /* Member rows are taller and larger so names read from the back of the
+     room; the list itself scrolls inside the fixed card height. */
+  .members {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    font-size: 1.1rem;
+    max-height: 170px;
+    overflow-y: auto;
+  }
+
+  .members::-webkit-scrollbar {
+    width: 6px;
+  }
+  .members::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .members::-webkit-scrollbar-thumb {
+    background: var(--color-line);
+    border-radius: 4px;
+  }
+
+  .members li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--color-surface-2);
+    border-radius: 8px;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--color-line);
+    overflow: hidden;
+  }
+
+  .members li span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  .members .rm {
+    background: none;
+    border: none;
+    color: var(--color-text-dim);
+    padding: 0 0.25rem;
+  }
+
+  .members .rm:hover {
+    color: var(--color-danger);
+  }
+
+  .empty-hint {
+    color: var(--color-text-dim);
+    font-size: 1rem;
+  }
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    /* Flat translucent ink. The overlay stays semi-translucent (alpha 0.82)
+       so the board reacting to scroll stays perceptible behind it, and it
+       scrolls its own tall content instead of swallowing document scroll —
+       both covered by e2e tests, keep those properties. */
+    background: rgb(10 10 15 / 0.82);
+    display: grid;
+    place-items: center;
+    padding: 1.5rem;
+    overflow-y: auto;
+    animation: overlay-in 0.45s cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+
+  .podium {
+    width: min(100%, 44rem);
+    text-align: center;
+    padding: 2.25rem 1.5rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-top: 3px solid var(--color-accent);
+    border-radius: 16px;
+    animation: podium-in 0.45s cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+
+  .podium-title {
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.24em;
+    color: var(--color-accent);
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+
+  #winner-name {
+    margin: 0.85rem 0 0.5rem;
+    font-family: var(--font-display);
+    font-size: clamp(2.4rem, 6vw, 3.4rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  #winner-members {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem auto 0;
+    color: var(--color-text-dim);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+    justify-content: center;
+    max-width: 40rem;
+    font-size: 1.15rem;
+  }
+
+  /* ===== Final podium: top-3 steps + ranked list below =====
+     Text always sits on solid blocks, dark ink on the bright chips and white
+     on the dark surfaces — WCAG AA or better everywhere, sized for a
+     washed-out projector. */
+
+  .podium-steps {
+    list-style: none;
+    margin: 1.25rem 0 0.75rem;
+    padding: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 0.9rem;
+  }
+
+  .podium-steps .step {
+    --team-color: var(--color-accent);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.35rem;
+    width: min(9.5rem, 28vw);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-line);
+    border-top: 10px solid var(--team-color);
+    border-radius: 14px 14px 0 0;
+    padding: 1rem 0.75rem 0.85rem;
+    min-width: 0;
+  }
+
+  .podium-steps .step[data-place="1"] {
+    order: 2;
+    min-height: 11rem;
+  }
+
+  .podium-steps .step[data-place="2"] {
+    order: 1;
+    min-height: 8rem;
+  }
+
+  .podium-steps .step[data-place="3"] {
+    order: 3;
+    min-height: 6.5rem;
+  }
+
+  .step-place {
+    background: var(--color-accent);
+    color: var(--color-ink);
+    font-weight: 800;
+    font-size: 1.15rem;
+    padding: 0.15rem 0.9rem;
+    border-radius: 999px;
+    letter-spacing: 0.05em;
+  }
+
+  .step-name {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.35rem;
+    line-height: 1.15;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+
+  .step-score {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+    font-size: clamp(2.4rem, 6vw, 3.4rem);
+    line-height: 1;
+    color: var(--color-text);
+  }
+
+  .ranking {
+    list-style: none;
+    margin: 0.5rem 0 1.25rem;
+    padding: 0 0.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .ranking li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-line);
+    border-radius: 10px;
+    padding: 0.6rem 0.9rem;
+    font-size: 1.15rem;
+  }
+
+  .ranking .rank {
+    font-weight: 800;
+    min-width: 2.4rem;
+    color: var(--color-accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ranking .rank-name {
+    flex: 1;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ranking .rank-score {
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+  }
+
+  .history {
+    max-width: 1180px;
+    margin: 0 auto 2rem;
+    padding: 0 1.75rem;
+  }
+
+  .history h2 {
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-text-dim);
+    font-weight: 700;
+  }
+
+  .history ul {
+    list-style: none;
+    margin: 0.75rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .history li {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: 10px;
+    padding: 0.7rem 1rem;
+    font-size: 1rem;
+  }
+
+  .history .when {
+    color: var(--color-text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: 1.75rem;
+    transform: translateX(-50%) translateY(1.25rem);
+    background: var(--color-danger);
+    color: var(--color-danger-ink);
+    font-weight: 700;
+    padding: 0.65rem 1.15rem;
+    border-radius: 999px;
+    opacity: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  #toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes card-in {
+  from {
+    transform: translateY(6px) scale(0.985);
+    opacity: 0;
+  }
+}
+
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes podium-in {
+  from {
+    transform: translateY(16px) scale(0.98);
+    opacity: 0;
+  }
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .topbar {
+    padding: 1.25rem;
+    align-items: stretch;
+  }
+
+  .controls {
+    width: 100%;
+  }
+
+  .controls > button,
+  .control {
+    flex: 1 1 100%;
+  }
+
+  .control-row {
+    width: 100%;
+  }
+
+  .control-row input,
+  .control-row button {
+    min-height: 2.85rem;
+  }
+
+  .board {
+    padding: 1.25rem;
+    gap: 1rem;
+  }
+
+  .points-row button {
+    min-height: 3rem;
+  }
+
+  .q-strip {
+    padding: 1rem;
+  }
+
+  #q-seconds {
+    width: 6rem;
+  }
+
+  .podium-steps {
+    flex-wrap: wrap;
+  }
+
+  .podium-steps .step {
+    width: 7.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card.card-enter,
+  .overlay,
+  .podium,
+  .view,
+  button {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* Award celebration: flash classes are removed synchronously in app.js;
+     confetti is never injected. This rule is the belt-and-braces guarantee. */
+  .confetti {
+    display: none !important;
+  }
+
+  /* Countdown tones are information, not decoration: under reduce the colors
+     stay and only the 1 s zoom breathing is disabled. */
+  .q-pulse,
+  #q-timer.q-pulse {
+    animation: none !important;
+  }
+}
+
+/* ===== Task 3: franja de pregunta (ad-hoc question strip) =====
+   Flat dark band over the board. `data-e` carries the round phase for the
+   accent border: live keeps the plain line, answered goes green, expired
+   goes danger. Hard 2px strokes only — no glows, no gradients. */
+
+.q-strip {
+  max-width: 1400px;
+  margin: 1.25rem auto 0;
+  background: var(--color-surface);
+  border: 2px solid var(--color-line);
+  border-radius: var(--radius-board);
+  padding: 1.1rem 1.5rem;
+}
+
+.q-strip[data-e="answered"] {
+  border-color: var(--color-success);
+}
+
+.q-strip[data-e="expired"] {
+  border-color: var(--color-danger);
+}
+
+#q-draft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+#q-input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-question);
+  font-size: 1.4rem;
+  padding: 0.7rem 1rem;
+}
+
+#q-seconds {
+  width: 7.5rem;
+  font-size: 1.3rem;
+}
+
+#q-live {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+}
+
+#q-text {
+  margin: 0;
+  font-family: var(--font-question);
+  font-size: clamp(2rem, 4.5vw, 3.4rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.q-count {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+#q-timer {
+  font-family: var(--font-timer);
+  /* Bebas ships a single 400 weight (800 would synthesize a faux bold) and
+     runs small/condensed: +16% size keeps the countdown's TV presence, and
+     the letter-spacing stops the digits from touching. */
+  font-size: 3.7rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  min-width: 2ch;
+  text-align: right;
+}
+
+.q-bar {
+  display: inline-block;
+  width: clamp(140px, 18vw, 300px);
+  height: 10px;
+  background: var(--color-line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+#q-bar {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: var(--color-text);
+  border-radius: 999px;
+}
+
+/* ===== Animated countdown tones =====
+   Thresholds from the validated design: ≤ 50 % of the round → orange (warn),
+   ≤ 5 s → red (danger) plus a 1 s zoom breathing on both the pill and the
+   bar. Flat dark theme rules hold: solid fills only, no gradients/shadows.
+   Padding + radius live on #q-timer permanently so the first colored tick
+   does not reflow the pill's neighbours. */
+
+#q-timer {
+  padding: 0 0.35rem;
+  border-radius: 999px;
+}
+
+#q-timer,
+#q-bar {
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+#q-timer.q-warn {
+  background: var(--color-timer-warn);
+  color: var(--color-timer-warn-ink);
+}
+
+#q-bar.q-warn {
+  background: var(--color-timer-warn);
+}
+
+#q-timer.q-danger {
+  background: var(--color-timer-danger);
+  color: var(--color-timer-danger-ink);
+}
+
+#q-bar.q-danger {
+  background: var(--color-timer-danger);
+}
+
+@keyframes q-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+/* Danger-only breathing, exactly the user's "intervalo de un segundo".
+   Transform never affects layout, so the strip's neighbours cannot jump.
+   The pulse lives on the pill and the bar container (.q-bar); the fill
+   inside it breathes along. */
+#q-timer.q-pulse,
+.q-bar.q-pulse {
+  animation: q-pulse 1s ease-in-out infinite;
+}
+
+#q-after {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+}
+
+#q-result {
+  margin: 0;
+  font-family: var(--font-question);
+  font-size: clamp(1.9rem, 4vw, 3rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+#q-result.q-ok {
+  color: var(--color-accent);
+}
+
+#q-result.q-bad {
+  color: var(--color-danger);
+}
+
+.q-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Professor control, not a game button: a small dim pill (spec). Size kept
+   readable — 1rem is the smallest informative text on the projector. */
+#undo-award {
+  background: transparent;
+  border: 1px solid var(--color-line);
+  color: var(--color-text-dim);
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+}
+
+/* Leader crown: decorative emoji, not data. */
+.crown {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+/* Award moment: the winner card fills flat with its team color while the
+   rest of the board dims; 8 colored squares fall inside the card. The flash
+   is two hard repaints (color on / color off) — nothing animates the card
+   itself, and score renders never touch these classes. */
+.card.flash {
+  position: relative;
+  background: var(--team-color, var(--color-surface));
+  color: var(--color-primary-ink);
+}
+
+.card.flash .members li {
+  background: transparent;
+  border-color: var(--color-ink);
+  color: var(--color-primary-ink);
+}
+
+.card.flash .points-row button {
+  background: transparent;
+  border-color: var(--color-ink);
+  color: var(--color-primary-ink);
+}
+
+.board.celebrating .card:not(.flash) {
+  opacity: 0.55;
+}
+
+.confetti {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  pointer-events: none;
+  animation: confetti-fall 0.9s ease forwards;
+}
+
+@keyframes confetti-fall {
+  from {
+    transform: translateY(0) rotate(0deg);
+  }
+  to {
+    transform: translateY(230px) rotate(160deg);
+  }
+}
